@@ -33,7 +33,7 @@ async def connect_socket_spot_ticker(exchange_price):
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_price)
 
             logging.info(f"{exchange} WebSocket 연결 합니다.")
             async with websockets.connect('wss://stream.binance.com:9443/ws', ping_interval=SOCKET_PING_INTERVAL,
@@ -72,12 +72,7 @@ async def connect_socket_spot_ticker(exchange_price):
                             exchange_price[ticker] = {exchange: None}
 
                         exchange_price[ticker][exchange] = float(data['c']) * \
-                        exchange_price['USD']['base'] if 'USD' in exchange_price else 0  * \
-                        exchange_price['USDT']['base'] if 'c' in data and 'USDT' in exchange_price else 1
-
-                        # logging.info(ticker, data) # 결과출력 테스트(주석)
-                        # 해외거래소 코인의 가격은 (가격 * USD(환율) * USDT/USD)
-                        # logging.info(f"{exchange} 가격표 확인", exchange_price)
+                                        exchange_price['USD']['base'] if 'USD' in exchange_price else 0
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
@@ -112,7 +107,7 @@ async def connect_socket_futures_ticker(exchange_price):
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_price)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Spot)")
             async with websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
@@ -136,7 +131,6 @@ async def connect_socket_futures_ticker(exchange_price):
                         logging.info(f"{exchange} Futures 데이터 요청 등록")
                         await websocket.send(subscribe_data)
                         await asyncio.sleep(1)
-                        # print("TEST : ", params_ticker)
                         params_ticker = []
 
                 logging.info(f"{exchange} 소켓 Futures 데이터 수신")
@@ -160,9 +154,6 @@ async def connect_socket_futures_ticker(exchange_price):
                             usd_price = 0
 
                         exchange_price[ticker][exchange] = float(data['c']) * usd_price
-
-                        # if ticker == 'BTC':
-                        #    print(f"선물 데이터 출력 : {ticker} | {exchange_price[ticker]}")
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
@@ -197,7 +188,7 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            # util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_price_orderbook)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,

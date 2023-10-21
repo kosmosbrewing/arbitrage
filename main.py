@@ -104,17 +104,17 @@ class Premium:
                                     if base_exchange_price else 0
 
                             if diff > NOTI_GAP_STANDARD:  # 미리 설정한 알림기준을 넘으면 저장
-                                message = "{} | {}/{} 현선갭 프리미엄% #{}# | ".format(ticker, base_exchange, compare_exchange, diff)
-                                message += "현재: #{}/{}# 원 | ".format(f"{base_exchange_price:,.2f}",
+                                message = "{} | {}/{} 현선갭 #{}%# | ".format(ticker, base_exchange, compare_exchange, diff)
+                                message += "현재: #{}/{}원# | ".format(f"{base_exchange_price:,.2f}",
                                                                    f"{compare_exchange_price:,.2f}")
                                 try:
-                                    message += "매수/매도 규모: #{}/{}# 원 | ".format(
+                                    message += "매수/매도 규모: #{}/{}원# | ".format(
                                         f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_amount']:,.0f}",
                                         f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_amount']:,.0f}")
-                                    message += "매수/매도 평균: #{}/{}# 원".format(
+                                    message += "매수/매도 평균: #{}/{}원#".format(
                                         f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_average']:,.2f}",
                                         f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_average']:,.2f}")
-                                except Exception as e:
+                                except:
                                     message += "호가 값 미수신"
                                 message_dict[diff] = message  # 발생갭을 키값으로 message 저장
                 # 갭 순서로 메시지 정렬
@@ -122,7 +122,7 @@ class Premium:
 
                 # 메세지 로깅 및 텔레그램 사이즈에 맞게 전처리
                 for i in message_dict:
-                    logging.info(f"ARBITRAGE : {message_dict[i]}")
+                    logging.info(f"Premium | {message_dict[i]}")
                     if len(message_list[len(message_list) - 1]) + len(message_dict[i]) < TELEGRAM_MESSAGE_MAX_SIZE:
                         message_list[len(message_list) - 1] += message_dict[i] + "\n"
                     else:

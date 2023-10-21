@@ -39,7 +39,7 @@ async def connect_socket_spot_ticker(exchange_price):
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_price)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Spot)")
             async with websockets.connect('wss://api.upbit.com/websocket/v1',
@@ -121,7 +121,7 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            # util.clear_exchange_price(exchange, exchange_price_orderbook)
+            util.clear_exchange_data(exchange, exchange_price_orderbook)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://api.upbit.com/websocket/v1',
