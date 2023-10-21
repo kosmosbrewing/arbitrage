@@ -1,5 +1,5 @@
 import asyncio
-from api import upbit, binance # ftx, bybit, okx, bitget
+from api import upbit, binance
 import util
 import traceback
 import time
@@ -15,7 +15,7 @@ from consts import *
     :param exchange_price : 거래소 별 가격 데이터를 저장할 딕셔너리
     ex) {'USD': {'base': 1349.0}, 'MBL': {'Upbit': 4.29}, 'TRX': {'Upbit': 119.0} }
     :param exchange_accum_trade_price:거래소 별 거래대금 데이터를 저장할 딕셔너리
-    ex) {'BTC': {'Upbit': 214.1, 'Binance': None, 'FTX': None, 'Bybit': None, 'OKX': None, 'Bitget': None}}
+    ex) {'BTC': {'Upbit': 214.1, 'Binance': None}}
 """
 
 class Premium:
@@ -56,40 +56,15 @@ class Premium:
                     asyncio.run(util.send_to_telegram(traceback.format_exc()))
                 ])
 
-    async def check_exchange_accum_trade_price(self):
-        """ 거래소별 코인의 누적거래대금을 조회해 self.exchange_accum_trade_price에 저장하는 함수
-        while문을 통해 일정 주기를 기준으로 무한히 반복 """
-        while True:
-            try:
-                await asyncio.sleep(ACCUM_TRADE_PRICE_DELAY)  # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
-
-                await asyncio.wait([
-                    asyncio.create_task(upbit.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price))
-                    , asyncio.create_task(binance.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price))
-                ])
-                # 거래소 별 누적거래대금 확인
-                # await upbit.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-                # await binance.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-                # await ftx.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-                # await bybit.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-                # await okx.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-                # await bitget.get_exchange_accum_trade_price(self.exchange_accum_trade_price, self.exchange_price)
-
-                await asyncio.sleep(ACCUM_TRADE_PRICE_UPDATE)
-            except Exception as e:
-                logging.info('이 메시지는 파일로 저장됩니다.')
-                logging.info("누적대금거래 조회 에러...", traceback.format_exc())
-                await util.send_to_telegram(traceback.format_exc())
-
     async def compare_price(self):
         """ self.exchange_price에 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
-        #await asyncio.sleep(10)  # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
         logging.info("가격 비교 시작!")
+        await util.send_to_telegram("✅ 가격비교 시작")
+
         base_message = "🔥프리미엄 정보\n"
-        #await util.send_to_telegram("✅ 가격비교 시작")
         while True:
             try:
-                await asyncio.sleep(300) # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
+                await asyncio.sleep(COMPARE_PRICE_DELAY) # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
                 exchange_price = self.exchange_price.copy()  # 거래소에서 얻어온 가격데이터 복사
                 message_dict = {}  # 갭 발생시 알람을 보낼 메시지를 저장해둘 딕셔너리
                 message_list = [""]  # message_dict에 저장했던 메시지들을 보낼 순서대로 저장한 리스트
@@ -111,9 +86,6 @@ class Premium:
                             if float(exchange_price[ticker][base_exchange]) > 0 \
                             else float(exchange_price[ticker][base_exchange])
 
-                        # if not base_exchange_price:  # 가격 정보가 없으면 pass
-                        #    continue
-
                         for j in range(i + 1, len(exchange_list)):
                             compare_exchange = exchange_list[j]
                             if exchange_price[ticker][compare_exchange] is None:  # 가격 정보가 없으면 pass
@@ -132,48 +104,46 @@ class Premium:
                                     if base_exchange_price else 0
 
                             if diff > NOTI_GAP_STANDARD:  # 미리 설정한 알림기준을 넘으면 저장
-                                message = "{} | {}/{} 프리미엄!{}%! | ".format(ticker, base_exchange, compare_exchange, diff)
-                                message += "현재가격: !{}/{}! 원 ".format(f"{base_exchange_price:,.2f}",
+                                message = "{} | {}/{} 현선갭 프리미엄% #{}# | ".format(ticker, base_exchange, compare_exchange, diff)
+                                message += "현재: #{}/{}# 원 | ".format(f"{base_exchange_price:,.2f}",
                                                                    f"{compare_exchange_price:,.2f}")
                                 try:
-                                    message += "현물 매수/선물 매도 규모: !{}/{}!원 | ".format(
-                                        f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_amount']:,.f}",
-                                        f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_amount']:,.f}")
-                                    message += "현물 매수/매도 평균 금액: !{}/{}! 원".format(
+                                    message += "매수/매도 규모: #{}/{}# 원 | ".format(
+                                        f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_amount']:,.0f}",
+                                        f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_amount']:,.0f}")
+                                    message += "매수/매도 평균: #{}/{}# 원".format(
                                         f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_average']:,.2f}",
                                         f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_average']:,.2f}")
                                 except Exception as e:
-                                    message += "거래대금 값 미수신"
-                                    # print(e)
+                                    message += "호가 값 미수신"
                                 message_dict[diff] = message  # 발생갭을 키값으로 message 저장
-                # 알림보내기 전 메시지 정렬
+                # 갭 순서로 메시지 정렬
                 message_dict = dict(sorted(message_dict.items(), reverse=True))  # 메시지 갭발생순으로 정렬
 
+                # 메세지 로깅 및 텔레그램 사이즈에 맞게 전처리
                 for i in message_dict:
-                    logging.info(f"ARBITRAGE : {message}")
+                    logging.info(f"ARBITRAGE : {message_dict[i]}")
                     if len(message_list[len(message_list) - 1]) + len(message_dict[i]) < TELEGRAM_MESSAGE_MAX_SIZE:
                         message_list[len(message_list) - 1] += message_dict[i] + "\n"
                     else:
                         message_list.append(message_dict[i] + "\n")
-                #message_list[0] = base_message + message_list[0]  # 알림 첫줄 구분용 문구추가
-                message_list[0] = message_list[0]
-                    # 정렬한 메시지를 순서대로 텔레그램 알람전송
+                message_list[0] = base_message + message_list[0]  # 알림 첫줄 구분용 문구추가
+                
+                # 정렬한 메시지를 순서대로 텔레그램 알람전송
                 for message in message_list:
-                    #logging.info(f"갭차이 발생 : \n{message}")
                     await util.send_to_telegram(message)
             except Exception as e:
                 logging.info(traceback.format_exc())
-                # await util.send_to_telegram(traceback.format_exc())
+                await util.send_to_telegram(traceback.format_exc())
 
     async def check_orderbook(self):
-        await asyncio.sleep(90)
+        await asyncio.sleep(CHECK_ORDERBOOK_DELAY)
 
         while True:
             try:
                 # 루프 무한으로 실행되어 다른 작업 못하는 것 방지
                 await asyncio.sleep(0.1)
                 exchange_price_orderbook = self.exchange_price_orderbook.copy()
-                #print(f"BTC 호가 값 : {exchange_price_orderbook['BTC']}")
 
                 # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
                 for ticker in exchange_price_orderbook:
@@ -191,12 +161,9 @@ class Premium:
                         bid_amount = 0
                         bid_size = 0
 
-                        # print(f"호가 계산!! {ticker} {exchange_list}")
                         for orderbook in exchange_price_orderbook[ticker][exchange_list]['orderbook_units']:
                             if orderbook is None:
                                 continue
-                            #print(f"호가 계산!! {ticker} {exchange_list} {orderbook} ")
-                            #print(f"{orderbook['bid_price']}")
 
                             bid_amount += float(orderbook['bid_price']) * float(orderbook['bid_size'])
                             bid_size += float(orderbook['bid_size'])
@@ -213,10 +180,6 @@ class Premium:
 
                         self.exchange_check_orderbook[ticker][exchange_list] = {"bid_amount" : bid_amount, "bid_average" : bid_average,
                                                 "ask_amount" : ask_amount, "ask_average" : ask_average}
-
-                    #if ticker == "BTC":
-                        #print(f"{ticker} 호가 계산 : {self.exchange_check_orderbook[ticker]}")
-
             except Exception as e:
                 logging.info(traceback.format_exc())
 

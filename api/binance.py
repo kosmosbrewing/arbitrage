@@ -1,5 +1,4 @@
 import requests
-
 from consts import *
 import util
 import asyncio
@@ -192,7 +191,7 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
     """Binance 소켓연결"""
     global exchange
     exchange = 'Binance'
-    await asyncio.sleep(30)
+    await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
@@ -277,11 +276,6 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
                         # 호가 데이터 저장
                         exchange_price_orderbook[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
-                        #if ticker == "BTC":
-                        #    print(f"{ticker} 호가 값 : {exchange_price_orderbook[ticker]}")
-
-                        #if ticker == "BTC":
-                            # print(f"출력: {exchange_price_orderbook[ticker]}")
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
@@ -304,25 +298,3 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
-
-async def get_exchange_accum_trade_price(exchange_accum_trade_price, exchange_price):
-    """ Binance 누적거래대금(단위금액:억) 조회 및 저장 """
-    logging.info(f"{exchange} get_exchange_accum_trade_price")
-    USD = exchange_price['USD']['base'] if 'USD' in exchange_price else 0
-    USDT = exchange_price['USDT']['base'] if 'USDT' in exchange_price else 1
-    res = requests.get("https://api.binance.com/api/v3/ticker/24hr").json()
-
-    for i in res:
-        if i['symbol'].endswith("USDT"):
-            ticker = i['symbol'].split("USDT")[0]
-
-            if ticker not in exchange_accum_trade_price:
-                exchange_accum_trade_price[ticker] = dict.fromkeys(EXCHANGE_LIST, None)
-
-            exchange_accum_trade_price[ticker][exchange] = round(float(i['quoteVolume']) * USD * USDT
-                                                                 / MILLION, 2)
-            # logging.info(f"{exchange} {ticker} 누적거래대금 : [{exchange_accum_trade_price}]")
-        await asyncio.sleep(0.1)
-
-if __name__ == "__main__":
-    logging.info(get_all_ticker())

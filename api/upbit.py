@@ -115,9 +115,8 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     global exchange
     exchange = 'Upbit'
-    await  asyncio.sleep(30)
+    await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket_orderbook")
-    # await asyncio.sleep(60)
     while True:
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
@@ -216,25 +215,3 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
 
-async def get_exchange_accum_trade_price(exchange_accum_trade_price, exchange_price):
-    """ Upbit 누적거래대금(단위금액:억) 조회 및 저장  """
-    # exchange_price에 BTC가격이 없으면 pyupbit를 이용해 조회
-    logging.info(f"{exchange} get_exchange_accum_trade_price")
-    btc_price = pyupbit.get_current_price("KRW-BTC")
-    for ticker in get_all_ticker():
-        df = pyupbit.get_ohlcv(ticker, count=1)
-        if isinstance(df, pd.DataFrame):
-            currency = ticker.split("-")[0]
-            symbol = ticker.split("-")[1]  # KRW-XRP > XRP
-            if symbol not in exchange_accum_trade_price:
-                exchange_accum_trade_price[symbol] = dict.fromkeys(EXCHANGE_LIST, None)
-            if currency == 'BTC':  # BTC마켓 코인은 BTC가격을 곱해줌
-                exchange_accum_trade_price[symbol][exchange] = round(df[-1:]['value'].values[0] * \
-                                                                     btc_price / MILLION, 2)
-            else:  # 원화마켓 코인은 그대로 저장
-                exchange_accum_trade_price[symbol][exchange] = round(df[-1:]['value'].values[0] / MILLION, 2)
-            # logging.info(f"{exchange} {ticker} 누적거래대금 : [{exchange_accum_trade_price}]")
-        await asyncio.sleep(0.1) # pyupbit 안정적으로 호출하기 위해 sleep
-
-if __name__ == "__main__":
-    logging.info(get_usd_price())
