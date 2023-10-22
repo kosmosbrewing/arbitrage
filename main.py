@@ -14,21 +14,20 @@ from consts import *
     :param exchange : 거래소 명
     :param exchange_price : 거래소 별 가격 데이터를 저장할 딕셔너리
     ex) {'USD': {'base': 1349.0}, 'MBL': {'Upbit': 4.29}, 'TRX': {'Upbit': 119.0} }
-    :param exchange_accum_trade_price:거래소 별 거래대금 데이터를 저장할 딕셔너리
+    :param exchange_price_orderbook:거래소 별 거래대금 데이터를 저장할 딕셔너리
     ex) {'BTC': {'Upbit': 214.1, 'Binance': None}}
 """
 
 class Premium:
     def __init__(self):
         self.exchange_price = {}  # 거래소별 가격 데이터를 저장할 딕셔너리
-        self.exchange_accum_trade_price = {}  # 거래소별 거래대금 데이터를 저장할 딕셔너리
         self.exchange_price_orderbook = {} # 거래소별 호가 데이터 저장
         self.exchange_check_orderbook = {}
         util.setup_logging()
 
     async def run(self):
-        logging.info('Start Premium Bot (Kosmos in Japan)')
-        await util.send_to_telegram('Start Premium Bot (Kosmos in Japan)')
+        logging.info('Start Premium Bot')
+        await util.send_to_telegram('Start Premium Bot')
         # 달러가격 및 거래소별 소켓연결, 누적거래대금을 조회가 동작하도록 만드는 main함수
 
         await asyncio.wait([
@@ -38,7 +37,6 @@ class Premium:
             #, asyncio.create_task(binance.connect_socket_spot_ticker(self.exchange_price))
             , asyncio.create_task(binance.connect_socket_futures_ticker(self.exchange_price))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_price, self.exchange_price_orderbook))
-            #, asyncio.create_task(self.check_exchange_accum_trade_price())
             , asyncio.create_task(self.compare_price())
             , asyncio.create_task(self.check_orderbook())
             #, asyncio.create_task(self.time_diff_checker())
@@ -52,9 +50,7 @@ class Premium:
                 upbit.get_usd_price(self.exchange_price)
                 await asyncio.sleep(DOLLAR_UPDATE)  # 달러가격 업데이트 주기, 1시간
             except Exception as e:
-                await asyncio.wait([
-                    asyncio.run(util.send_to_telegram(traceback.format_exc()))
-                ])
+                await util.send_to_telegram(traceback.format_exc())
 
     async def compare_price(self):
         """ self.exchange_price에 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
@@ -104,25 +100,26 @@ class Premium:
                                     if base_exchange_price else 0
 
                             if diff > NOTI_GAP_STANDARD:  # 미리 설정한 알림기준을 넘으면 저장
-                                message = "{} | {}/{} 현선갭 #{}%# | ".format(ticker, base_exchange, compare_exchange, diff)
-                                message += "현재: #{}/{}원# | ".format(f"{base_exchange_price:,.2f}",
+                                message = "{}|{}|{}|{}%|".format(ticker, base_exchange, compare_exchange, diff)
+                                message += "{}/{}원|".format(f"{base_exchange_price:,.2f}",
                                                                    f"{compare_exchange_price:,.2f}")
+                                # ASK : 매도, BID ; 매수, ASK/BID 호가만큼 시장가로 긁으면 매수/매도 금액
                                 try:
-                                    message += "매수/매도 규모: #{}/{}원# | ".format(
+                                    message += "{}/{}원|".format(
                                         f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_amount']:,.0f}",
                                         f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_amount']:,.0f}")
-                                    message += "매수/매도 평균: #{}/{}원#".format(
-                                        f"{self.exchange_check_orderbook[ticker][base_exchange]['ask_average']:,.2f}",
-                                        f"{self.exchange_check_orderbook[ticker][compare_exchange]['bid_average']:,.2f}")
+                                    message += "{}/{}원".format(
+                                        f"{self.exchange_check_orderbook[ticker][base_exchange]['balance_ask_average']:,.2f}",
+                                        f"{self.exchange_check_orderbook[ticker][compare_exchange]['balance_bid_average']:,.2f}")
                                 except:
-                                    message += "호가 값 미수신"
+                                    message += "호가미수신"
                                 message_dict[diff] = message  # 발생갭을 키값으로 message 저장
                 # 갭 순서로 메시지 정렬
                 message_dict = dict(sorted(message_dict.items(), reverse=True))  # 메시지 갭발생순으로 정렬
 
                 # 메세지 로깅 및 텔레그램 사이즈에 맞게 전처리
                 for i in message_dict:
-                    logging.info(f"Premium | {message_dict[i]}")
+                    logging.info(f"Premium|{message_dict[i]}")
                     if len(message_list[len(message_list) - 1]) + len(message_dict[i]) < TELEGRAM_MESSAGE_MAX_SIZE:
                         message_list[len(message_list) - 1] += message_dict[i] + "\n"
                     else:
@@ -160,6 +157,9 @@ class Premium:
                         ask_size = 0
                         bid_amount = 0
                         bid_size = 0
+                        balnace_check = 0
+                        balance_bid_average = 0
+                        balance_ask_average = 0
 
                         for orderbook in exchange_price_orderbook[ticker][exchange_list]['orderbook_units']:
                             if orderbook is None:
@@ -170,16 +170,17 @@ class Premium:
                             ask_amount += float(orderbook['ask_price']) * float(orderbook['ask_size'])
                             ask_size += float(orderbook['ask_size'])
 
-                        if bid_size == 0:
-                            bid_size = 1
-                        if ask_size == 0:
-                            ask_size = 1
+                            if bid_amount > BALANCE and balnace_check == 0:
+                                balance_bid_average = round(float(bid_amount / bid_size), 2) if bid_size != 0 else 0
+                                balance_ask_average = round(float(ask_amount / ask_size), 2) if ask_size != 0 else 0
+                                balnace_check += 1
 
-                        bid_average = round(float(bid_amount / bid_size), 2)
-                        ask_average = round(float(ask_amount / ask_size), 2)
+                        bid_average = round(float(bid_amount / bid_size), 2) if bid_size != 0 else 0
+                        ask_average = round(float(ask_amount / ask_size), 2) if ask_size != 0 else 0
 
                         self.exchange_check_orderbook[ticker][exchange_list] = {"bid_amount" : bid_amount, "bid_average" : bid_average,
-                                                "ask_amount" : ask_amount, "ask_average" : ask_average}
+                                            "ask_amount" : ask_amount, "ask_average" : ask_average,
+                                            "balance_bid_average" : balance_bid_average, "balance_ask_average" : balance_ask_average }
             except Exception as e:
                 logging.info(traceback.format_exc())
 

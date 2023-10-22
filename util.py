@@ -1,3 +1,5 @@
+from logging.handlers import TimedRotatingFileHandler
+
 import telegram
 import asyncio
 import aiohttp
@@ -12,18 +14,24 @@ chat_id_list = None
 
 def setup_logging():
     logging.basicConfig(level=logging.INFO)
-    now = datetime.now()
-    date = now.strftime("%Y%m%d")
-
-    log_file_path = '/root/arbitrage/log/premium-' + str(date) + '.log'
-    log_file_path = 'C:/Users/skdba/OneDrive/바탕 화면/kosmos/graduate/premium/premium-' + str(date) + '.log'
+    # TimedRotatingFileHandler를 설정하여 날짜별로 로그 파일을 회전
+    if ENV == 'real':
+        log_file_path = '/root/arbitrage/log/premium.log'
+    elif ENV == 'local':
+        log_file_path = 'C:/Users/skdba/OneDrive/바탕 화면/kosmos/graduate/premium/premium.log'
 
     # 파일 핸들러 생성 및 설정
-    file_handler = logging.FileHandler(filename=log_file_path)
+
+    file_handler = TimedRotatingFileHandler(filename=log_file_path, when='midnight', interval=1, backupCount=30)
+    file_handler.suffix = "-%Y%m%d.log'"
     file_handler.setLevel(logging.INFO)
 
     # 로그 포매터 설정
-    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] : %(message)s ...(%(filename)s:%(lineno)d)')
+    if ENV == 'real':
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s]:%(message)s')
+    elif ENV == 'local':
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s]:%(message)s ...(%(filename)s:%(lineno)d)')
+
     file_handler.setFormatter(formatter)
 
     # 루트 로거에 핸들러 추가
@@ -81,12 +89,21 @@ async def send_to_telegram(message):
                 bot = None
                 break
 
-def clear_exchange_data(exchange, exchange_data):
+def clear_exchange_price(exchange, exchange_price):
     # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
-    logging.info(f"{exchange} 데이터 클리어 : [{exchange_data}]")
-    for ticker in exchange_data:
-        if exchange in exchange_data[ticker]:
-            del exchange_data[ticker][exchange]
+    logging.info(f"{exchange} 현재가 데이터 클리어 : [{exchange_price}]")
+    for ticker in exchange_price:
+        if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
+            continue
+        exchange_price[ticker][exchange] = 0
+
+def clear_exchange_price_orderbook(exchange, exchange_price_orderbook):
+    # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
+    logging.info(f"{exchange} 데이터 클리어 : [{exchange_price_orderbook}]")
+    for ticker in exchange_price_orderbook:
+        for i in range(0,ORDERBOOK_SIZE):
+            exchange_price_orderbook[ticker][exchange]['orderbook_units'][i] = {"ask_price" : 0, "bid_price" : 0,
+                                                                                "ask_size" : 0, "bid_size" : 0 }
 
 def is_need_reset_socket(start_time):
     #매일 오전 9시인지 확인해 9시가 넘었다면 True를 반환 (Websocket 재연결목적)

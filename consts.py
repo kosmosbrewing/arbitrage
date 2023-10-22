@@ -1,13 +1,10 @@
+# Enviroment
+ENV='local'
 # Exchanges
 UPBIT = 'Upbit'
 BINANCE = 'Binance'
-FTX = 'FTX'
-BYBIT = 'Bybit'
-OKX = 'OKX'
-BITGET = 'Bitget'
 # All Exchanges
 EXCHANGE_LIST = [UPBIT, BINANCE]
-# EXCHANGE_LIST = [UPBIT, BINANCE]
 # WEBSOCKET
 SOCKET_PING_INTERVAL = 20 # 20초
 SOCKET_RETRY_TIME = 30 # 30초

@@ -32,14 +32,14 @@ def get_usd_price(exchange_price):
 async def connect_socket_spot_ticker(exchange_price):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     global exchange
-    exchange = 'Upbit'
+    exchange = UPBIT
 
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_data(exchange, exchange_price)
+            util.clear_exchange_price(exchange, exchange_price)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Spot)")
             async with websockets.connect('wss://api.upbit.com/websocket/v1',
@@ -68,6 +68,7 @@ async def connect_socket_spot_ticker(exchange_price):
                         if 'code' not in data: # 응답 데이터(딕셔너리)에 code가 없는 경우 제외
                             logging.info(f"{exchange} [Data error] : {data}")
                             continue
+
                         if "BTC" in exchange_price:
                             btc_price = float(exchange_price['BTC'][exchange])
                         else:
@@ -89,6 +90,7 @@ async def connect_socket_spot_ticker(exchange_price):
                             exchange_price[ticker][exchange] = float(data['trade_price'])
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
+                            logging.info('[{}] Time to new connection...'.format(exchange))
                             await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
 
@@ -114,14 +116,14 @@ async def connect_socket_spot_ticker(exchange_price):
 async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     global exchange
-    exchange = 'Upbit'
+    exchange = UPBIT
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket_orderbook")
     while True:
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_data(exchange, exchange_price_orderbook)
+            util.clear_exchange_price_orderbook(exchange, exchange_price_orderbook)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://api.upbit.com/websocket/v1',
@@ -191,8 +193,8 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
                         # 호가 데이터 저장
                         exchange_price_orderbook[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
-
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
+                            logging.info('[{}] Time to new connection...'.format(exchange))
                             await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
 
@@ -206,7 +208,7 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             break
                     except:
-                        logging.info(traceback.format_exc())
+                        logging.error(traceback.format_exc())
                 await websocket.close()
         except socket.gaierror:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
