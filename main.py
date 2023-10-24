@@ -78,6 +78,9 @@ class Premium:
                         if exchange_price[ticker][base_exchange] is None:  # 가격 정보가 없으면 pass
                             continue
 
+                        if ticker == 'BTC':
+                            print(f"TEST : {exchange_price[ticker]}")
+
                         open_base_exchange_price =  \
                             round(float(exchange_price[ticker][base_exchange]['balance_ask_average']), 2) \
                             if float(exchange_price[ticker][base_exchange]['balance_ask_average']) > 0 \
@@ -100,8 +103,7 @@ class Premium:
                                 if float(exchange_price[ticker][compare_exchange]['balance_bid_average']) > 0 \
                                 else float(exchange_price[ticker][compare_exchange]['balance_bid_average'])
 
-                            close_compare_exchange_price = round(
-                                float(exchange_price[ticker][compare_exchange]['balance_ask_average']), 2) \
+                            close_compare_exchange_price = round(float(exchange_price[ticker][compare_exchange]['balance_ask_average']), 2) \
                                 if float(exchange_price[ticker][compare_exchange]['balance_ask_average']) > 0 \
                                 else float(exchange_price[ticker][compare_exchange]['balance_ask_average'])
 
@@ -164,7 +166,7 @@ class Premium:
         while True:
             try:
                 # 루프 무한으로 실행되어 다른 작업 못하는 것 방지
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(1)
                 exchange_price_orderbook = self.exchange_price_orderbook.copy()
 
                 # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
@@ -182,7 +184,8 @@ class Premium:
                         ask_size = 0
                         bid_amount = 0
                         bid_size = 0
-                        balnace_check = 0
+                        balance_bid_check = 0
+                        balance_ask_check = 0
                         balance_bid_average = 0
                         balance_ask_average = 0
 
@@ -195,10 +198,15 @@ class Premium:
                             ask_amount += float(orderbook['ask_price']) * float(orderbook['ask_size'])
                             ask_size += float(orderbook['ask_size'])
 
-                            if bid_amount > BALANCE and balnace_check == 0:
+                            ## bid_amount 로직 수정하기
+                            if bid_amount > BALANCE and balance_bid_check == 0:
                                 balance_bid_average = round(float(bid_amount / bid_size), 2) if bid_size != 0 else 0
+                                balance_bid_check += 1
+
+                            if ask_amount > BALANCE and balance_ask_check == 0:
                                 balance_ask_average = round(float(ask_amount / ask_size), 2) if ask_size != 0 else 0
-                                balnace_check += 1
+                                balance_ask_check += 1
+
 
                         bid_average = round(float(bid_amount / bid_size), 2) if bid_size != 0 else 0
                         ask_average = round(float(ask_amount / ask_size), 2) if ask_size != 0 else 0
