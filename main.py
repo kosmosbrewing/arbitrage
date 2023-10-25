@@ -32,10 +32,10 @@ class Premium:
 
         await asyncio.wait([
             asyncio.create_task(self.get_usd_price())
-            , asyncio.create_task(upbit.connect_socket_spot_ticker(self.exchange_price))
+            #, asyncio.create_task(upbit.connect_socket_spot_ticker(self.exchange_price))
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchange_price, self.exchange_price_orderbook))
             #, asyncio.create_task(binance.connect_socket_spot_ticker(self.exchange_price))
-            , asyncio.create_task(binance.connect_socket_futures_ticker(self.exchange_price))
+            #, asyncio.create_task(binance.connect_socket_futures_ticker(self.exchange_price))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_price, self.exchange_price_orderbook))
             , asyncio.create_task(self.compare_price())
             , asyncio.create_task(self.check_orderbook())
@@ -78,18 +78,11 @@ class Premium:
                         if exchange_price[ticker][base_exchange] is None:  # 가격 정보가 없으면 pass
                             continue
 
-                        if ticker == 'BTC':
+                        if ticker == 'ETH':
                             print(f"TEST : {exchange_price[ticker]}")
 
-                        open_base_exchange_price =  \
-                            round(float(exchange_price[ticker][base_exchange]['balance_ask_average']), 2) \
-                            if float(exchange_price[ticker][base_exchange]['balance_ask_average']) > 0 \
-                            else float(exchange_price[ticker][base_exchange]['balance_ask_average'])
-
-                        close_base_exchange_price = \
-                            round(float(exchange_price[ticker][base_exchange]['balance_bid_average']), 2) \
-                                if float(exchange_price[ticker][base_exchange]['balance_bid_average']) > 0 \
-                                else float(exchange_price[ticker][base_exchange]['balance_bid_average'])
+                        open_base_exchange_price = float(exchange_price[ticker][base_exchange]['balance_ask_average'])
+                        close_base_exchange_price = float(exchange_price[ticker][base_exchange]['balance_bid_average'])
 
                         if open_base_exchange_price == 0 or close_base_exchange_price == 0:
                             continue
@@ -99,33 +92,25 @@ class Premium:
                             if exchange_price[ticker][compare_exchange] is None:  # 가격 정보가 없으면 pass
                                 continue
 
-                            open_compare_exchange_price = round(float(exchange_price[ticker][compare_exchange]['balance_bid_average']), 2) \
-                                if float(exchange_price[ticker][compare_exchange]['balance_bid_average']) > 0 \
-                                else float(exchange_price[ticker][compare_exchange]['balance_bid_average'])
-
-                            close_compare_exchange_price = round(float(exchange_price[ticker][compare_exchange]['balance_ask_average']), 2) \
-                                if float(exchange_price[ticker][compare_exchange]['balance_ask_average']) > 0 \
-                                else float(exchange_price[ticker][compare_exchange]['balance_ask_average'])
+                            open_compare_exchange_price = float(exchange_price[ticker][compare_exchange]['balance_bid_average'])
+                            close_compare_exchange_price = float(exchange_price[ticker][compare_exchange]['balance_ask_average'])
 
                             if open_compare_exchange_price == 0 or close_compare_exchange_price == 0:
                                 continue
 
                             # 거래소간의 가격차이(%)
                             if open_base_exchange_price > open_compare_exchange_price:
-                                open_diff = round((open_base_exchange_price - open_compare_exchange_price) / open_compare_exchange_price * 100, 2) \
-                                    if open_compare_exchange_price else 0
+                                open_diff = round((open_base_exchange_price - open_compare_exchange_price) / open_compare_exchange_price * 100, 2)
                             elif open_compare_exchange_price > open_base_exchange_price:
-                                open_diff = round((open_compare_exchange_price - open_base_exchange_price) / open_base_exchange_price * 100, 2) * -1 \
-                                    if open_base_exchange_price else 0
+                                open_diff = round((open_compare_exchange_price - open_base_exchange_price) / open_base_exchange_price * 100, 2) * -1
 
                             if close_base_exchange_price > close_compare_exchange_price:
-                                close_diff = round((close_base_exchange_price - close_compare_exchange_price) / close_compare_exchange_price * 100, 2) \
-                                    if open_compare_exchange_price else 0
+                                close_diff = round((close_base_exchange_price - close_compare_exchange_price) / close_compare_exchange_price * 100, 2)
                             elif close_compare_exchange_price > close_base_exchange_price:
-                                close_diff = round((close_compare_exchange_price - close_base_exchange_price) / close_base_exchange_price * 100, 2) * -1 \
-                                    if close_base_exchange_price else 0
+                                close_diff = round((close_compare_exchange_price - close_base_exchange_price) / close_base_exchange_price * 100, 2) * -1
 
                             # ASK : 매도, BID ; 매수, ASK/BID 호가만큼 시장가로 긁으면 매수/매도 금액
+                            message = "Premium|"
                             try:
                                 message = "{}|{}|{}|".format(ticker, base_exchange, compare_exchange)
                                 message += "OPEN|{}%|{}/{}원|".format(open_diff, f"{open_base_exchange_price:,.2f}",
@@ -137,6 +122,7 @@ class Premium:
                                 message += "AMOUNT|{}/{}원|".format(
                                     f"{exchange_price[ticker][base_exchange]['ask_amount']:,.0f}",
                                     f"{exchange_price[ticker][compare_exchange]['bid_amount']:,.0f}")
+                                logging.info(f"{message}")
                             except:
                                 message += "호가미수신"
                             message_dict[open_diff] = message  # 발생갭을 키값으로 message 저장
@@ -146,7 +132,7 @@ class Premium:
 
                 # 메세지 로깅 및 텔레그램 사이즈에 맞게 전처리
                 for i in message_dict:
-                    logging.info(f"Premium|{message_dict[i]}")
+                    #logging.info(f"Premium|{message_dict[i]}")
                     if len(message_list[len(message_list) - 1]) + len(message_dict[i]) < TELEGRAM_MESSAGE_MAX_SIZE:
                         message_list[len(message_list) - 1] += message_dict[i] + "\n"
                     else:
