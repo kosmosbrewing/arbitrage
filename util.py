@@ -18,12 +18,12 @@ def setup_logging():
     if ENV == 'real':
         log_file_path = '/root/arbitrage/log/premium.log'
     elif ENV == 'local':
-        log_file_path = 'C:/Users/skdba/OneDrive/바탕 화면/kosmos/graduate/premium/premium.log'
+        log_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium.log'
 
     # 파일 핸들러 생성 및 설정
 
     file_handler = TimedRotatingFileHandler(filename=log_file_path, when='midnight', interval=1, backupCount=30)
-    file_handler.suffix = "-%Y%m%d.log'"
+    file_handler.suffix = "_%Y%m%d"
     file_handler.setLevel(logging.INFO)
 
     # 로그 포매터 설정
@@ -79,7 +79,38 @@ async def send_to_telegram(message):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
-                # await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                break
+            except telegram.error.TimedOut as e:
+                logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
+                await asyncio.sleep(5)
+            except Exception as e:
+                logging.info(f"Telegram 연결 해제... {e}")
+                bot = None
+                break
+
+async def send_to_telegram_image(image):
+    # 텔레그램 메시지 보내는 함수, 최대 3회 연결, 3회 전송 재시도 수행
+    global bot
+    global chat_id_list
+
+    if chat_id_list is None:
+        chat_id_list = await get_chat_id()
+        #logging.info(f"Telegram Chat ID 값 취득 : {get_chat_id()}")
+        # chat_id_list = ['1109591824'] # 준우
+        # chat_id_list = ['1109591824', '2121677449']  #
+        chat_id_list = ['2121677449']  # 규빈
+        logging.info(f"Telegram Chat ID 값 취득 : {chat_id_list}")
+
+    if bot is None:
+        logging.info("Telegram 연결 시도...")
+        bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
+
+    for chat_id in chat_id_list:
+        for i in range(3):
+            try:
+                # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
+                await bot.send_photo(chat_id, photo=open(image, 'rb'))
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
@@ -91,7 +122,7 @@ async def send_to_telegram(message):
 
 def clear_exchange_price(exchange, exchange_price):
     # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
-    logging.info(f"{exchange} 현재가 데이터 클리어 : [{exchange_price}]")
+    logging.info(f"{exchange} exchange_price 데이터 클리어 : [{exchange_price}]")
     for ticker in exchange_price:
         if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
             continue
@@ -99,7 +130,7 @@ def clear_exchange_price(exchange, exchange_price):
 
 def clear_exchange_price_orderbook(exchange, exchange_price_orderbook):
     # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
-    logging.info(f"{exchange} 데이터 클리어 : [{exchange_price_orderbook}]")
+    logging.info(f"{exchange} exchange_price_orderbook 데이터 클리어 : [{exchange_price_orderbook}]")
     for ticker in exchange_price_orderbook:
         for i in range(0,ORDERBOOK_SIZE):
             exchange_price_orderbook[ticker][exchange]['orderbook_units'][i] = {"ask_price" : 0, "bid_price" : 0,

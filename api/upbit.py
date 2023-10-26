@@ -193,10 +193,10 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
                         # 호가 데이터 저장
                         exchange_price_orderbook[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
-                        if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
-                            logging.info('[{}] Time to new connection...'.format(exchange))
-                            await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
-                            break
+                        #if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
+                        #    logging.info('[{}] Time to new connection...'.format(exchange))
+                        #    await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
+                        #    break
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
