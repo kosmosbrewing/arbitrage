@@ -98,7 +98,7 @@ async def send_to_telegram_image(image):
         chat_id_list = await get_chat_id()
         #logging.info(f"Telegram Chat ID 값 취득 : {get_chat_id()}")
         # chat_id_list = ['1109591824'] # 준우
-        # chat_id_list = ['1109591824', '2121677449']  #
+        #chat_id_list = ['1109591824', '2121677449']  #
         chat_id_list = ['2121677449']  # 규빈
         logging.info(f"Telegram Chat ID 값 취득 : {chat_id_list}")
 
@@ -135,7 +135,6 @@ def clear_exchange_price_orderbook(exchange, exchange_price_orderbook):
         for i in range(0,ORDERBOOK_SIZE):
             exchange_price_orderbook[ticker][exchange]['orderbook_units'][i] = {"ask_price" : 0, "bid_price" : 0,
                                                                                 "ask_size" : 0, "bid_size" : 0 }
-
 def is_need_reset_socket(start_time):
     #매일 오전 9시인지 확인해 9시가 넘었다면 True를 반환 (Websocket 재연결목적)
     now = datetime.now()
