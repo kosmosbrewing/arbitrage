@@ -79,7 +79,7 @@ async def send_to_telegram(message):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
-                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                # await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
@@ -98,8 +98,8 @@ async def send_to_telegram_image(image):
         chat_id_list = await get_chat_id()
         #logging.info(f"Telegram Chat ID 값 취득 : {get_chat_id()}")
         # chat_id_list = ['1109591824'] # 준우
-        #chat_id_list = ['1109591824', '2121677449']  #
-        chat_id_list = ['2121677449']  # 규빈
+        chat_id_list = ['1109591824', '2121677449']  #
+        #chat_id_list = ['2121677449']  # 규빈
         logging.info(f"Telegram Chat ID 값 취득 : {chat_id_list}")
 
     if bot is None:
