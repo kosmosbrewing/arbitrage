@@ -31,14 +31,18 @@ async def make_graph():
         close_data = split_data[9]
         amount = split_data[13]
         # usd = split_data[15]
-
+        
+        # 전일자 데이터 담기
         if ticker in measure_ticker:
             measure_ticker[ticker]['units'].append({"open_gap": open_gap, "open_data": open_data, "open_gap_avg": 0,
-                                                    "close_gap": close_gap, "close_data": close_data,
-                                                    "close_gap_avg": 0})
+                                                    "close_gap": close_gap, "close_data": close_data, "close_gap_avg": 0})
+
+    # 그래프 변수 초기화
     figure_idx = 0
     subplot_idx = 0
     subplot_loc = [[331, 332, 333, 334, 335, 336, 337, 338, 339],
+                   [331, 332, 333, 334, 335, 336, 337, 338, 339],
+                   [331, 332, 333, 334, 335, 336, 337, 338, 339],
                    [331, 332, 333, 334, 335, 336, 337, 338, 339],
                    [331, 332, 333, 334, 335, 336, 337, 338, 339],
                    [331, 332, 333, 334, 335, 336, 337, 338, 339],
@@ -74,8 +78,9 @@ async def make_graph():
     image_set.append(image_temp)
     plt.savefig(image_temp, format='png')
 
-    for image in image_set:
-        await util.send_to_telegram_image(image)
+    plt.show()
+    #for image in image_set:
+        #await util.send_to_telegram_image(image)
 
 if __name__ == "__main__":
     asyncio.run(make_graph())
