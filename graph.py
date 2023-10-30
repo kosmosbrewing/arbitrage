@@ -18,6 +18,12 @@ async def make_graph():
 
     lines = measure.load_history_data()
     measure_ticker = measure.get_measure_ticker()
+    
+    # BTC랑 ETH는 무조건 추가
+    measure_ticker['BTC'] = {"units": []}
+    measure_ticker['ETH'] = {"units": []}
+    measure_ticker['LOOM'] = {"units": []}
+    front_gap = {}
 
     for line in lines:
         split_data = line.split('|')
@@ -25,17 +31,31 @@ async def make_graph():
         ticker = split_data[1]
         # base_exchange = split_data[2]
         # compare_exchange = split_data[3]
-        open_gap = split_data[5]
+        open_gap = float(split_data[5])
         open_data = split_data[6]
-        close_gap = split_data[8]
+        close_gap = float(split_data[8])
         close_data = split_data[9]
         amount = split_data[13]
         # usd = split_data[15]
-        
+
+        if ticker not in front_gap:
+            front_gap[ticker] = {"front_open_gap": open_gap, "front_close_gap": close_gap}
+
+        front_open_gap = front_gap[ticker]['front_open_gap']
+        front_close_gap = front_gap[ticker]['front_close_gap']
+
+        front_gap[ticker]['front_open_gap'] = open_gap
+        front_gap[ticker]['front_close_gap'] = close_gap
+
+        if open_gap - front_open_gap > FRONT_GAP or front_close_gap - close_gap > FRONT_GAP:
+            continue
+
         # 전일자 데이터 담기
         if ticker in measure_ticker:
             measure_ticker[ticker]['units'].append({"open_gap": open_gap, "open_data": open_data, "open_gap_avg": 0,
                                                     "close_gap": close_gap, "close_data": close_data, "close_gap_avg": 0})
+
+
 
     # 그래프 변수 초기화
     figure_idx = 0
@@ -70,7 +90,7 @@ async def make_graph():
         if subplot_idx == 9:
             image_temp = image_file_path + '_' + str(figure_idx+1) + '.png'
             image_set.append(image_temp)
-            plt.savefig(image_temp + '_' + str(figure_idx+1) + '.png', format='png')
+            plt.savefig(image_temp, format='png')
             figure_idx += 1
             subplot_idx = 0
 
