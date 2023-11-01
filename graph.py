@@ -22,7 +22,6 @@ async def make_graph():
     # BTC랑 ETH는 무조건 추가
     measure_ticker['BTC'] = {"units": []}
     measure_ticker['ETH'] = {"units": []}
-    measure_ticker['LOOM'] = {"units": []}
     front_gap = {}
 
     for line in lines:
@@ -47,15 +46,13 @@ async def make_graph():
         front_gap[ticker]['front_open_gap'] = open_gap
         front_gap[ticker]['front_close_gap'] = close_gap
 
-        if open_gap - front_open_gap > FRONT_GAP or front_close_gap - close_gap > FRONT_GAP:
-            continue
+        #if open_gap - front_open_gap > FRONT_GAP or front_close_gap - close_gap > FRONT_GAP:
+        #    continue
 
         # 전일자 데이터 담기
         if ticker in measure_ticker:
             measure_ticker[ticker]['units'].append({"open_gap": open_gap, "open_data": open_data, "open_gap_avg": 0,
                                                     "close_gap": close_gap, "close_data": close_data, "close_gap_avg": 0})
-
-
 
     # 그래프 변수 초기화
     figure_idx = 0
@@ -73,10 +70,14 @@ async def make_graph():
         # 데이터 준비
         open_gap = []
         close_gap = []
+        btc_open_gap = []
 
         for i in range(0, len(measure_ticker[graph_ticker]['units'])):
             open_gap.append(float(measure_ticker[graph_ticker]['units'][i]['open_gap']))
             close_gap.append(float(measure_ticker[graph_ticker]['units'][i]['close_gap']))
+
+        for i in range(0, len(measure_ticker['BTC']['units'])):
+            btc_open_gap.append(float(measure_ticker['BTC']['units'][i]['open_gap']))
 
         # 그래프 그리기
         plt.figure(figure_idx,figsize=(18, 12)) # 그래프 개수
@@ -84,6 +85,7 @@ async def make_graph():
         plt.title(graph_ticker)
         plt.plot(open_gap, label='open', color='blue')
         plt.plot(close_gap, label='close', color='red')
+        plt.plot(btc_open_gap, label='open', color='black')
         plt.ylabel('gap')
         subplot_idx += 1
 

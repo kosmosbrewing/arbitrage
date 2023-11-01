@@ -23,7 +23,7 @@ def setup_logging():
     # 파일 핸들러 생성 및 설정
 
     file_handler = TimedRotatingFileHandler(filename=log_file_path, when='midnight', interval=1, backupCount=30)
-    file_handler.suffix = "_%Y%m%d"
+    file_handler.suffix = "%Y%m%d"
     file_handler.setLevel(logging.INFO)
 
     # 로그 포매터 설정

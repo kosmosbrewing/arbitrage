@@ -113,7 +113,7 @@ async def connect_socket_spot_ticker(exchange_price):
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
 
-async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook):
+async def connect_socket_spot_orderbook(exchange_price, orderbook_info):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     global exchange
     exchange = UPBIT
@@ -123,7 +123,7 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price_orderbook(exchange, exchange_price_orderbook)
+            #util.clear_orderbook_info(exchange, orderbook_info)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://api.upbit.com/websocket/v1',
@@ -184,14 +184,14 @@ async def connect_socket_spot_orderbook(exchange_price, exchange_price_orderbook
                                 else:
                                     orderbook_units_temp[i] = data['orderbook_units'][i]
 
-                        if ticker not in exchange_price_orderbook:
-                            exchange_price_orderbook[ticker] = {}
+                        if ticker not in orderbook_info:
+                            orderbook_info[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
-                                exchange_price_orderbook[ticker].update({exchange_list: None})
-                                exchange_price_orderbook[ticker][exchange_list] = {"orderbook_units": [None]}
+                                orderbook_info[ticker].update({exchange_list: None})
+                                orderbook_info[ticker][exchange_list] = {"orderbook_units": [None]}
 
                         # 호가 데이터 저장
-                        exchange_price_orderbook[ticker][exchange]["orderbook_units"] = orderbook_units_temp
+                        orderbook_info[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
                         #if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                         #    logging.info('[{}] Time to new connection...'.format(exchange))

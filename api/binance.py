@@ -179,7 +179,7 @@ async def connect_socket_futures_ticker(exchange_price):
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
 
-async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderbook):
+async def connect_socket_futures_orderbook(exchange_price, orderbook_info):
     """Binance 소켓연결"""
     global exchange
     exchange = BINANCE
@@ -189,7 +189,7 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price_orderbook(exchange, exchange_price_orderbook)
+            #util.clear_orderbook_info(exchange, orderbook_info)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
@@ -231,41 +231,42 @@ async def connect_socket_futures_orderbook(exchange_price, exchange_price_orderb
                         else:
                             usd_price = 0
 
-                        orderbook_units_temp = []
                         ask_len = len(data['a'])
                         bid_len = len(data['b'])
 
-                        for i in range(0,ORDERBOOK_SIZE):
-                            orderbook_units_temp.append({"ask_price" : 0, "bid_price" : 0, "ask_size" : 0, "bid_size" : 0 })
+                        #print(f"{ticker}|ASK|{data['a'][0]}|BID|{data['b'][bid_len-1]}")
+                        orderbook_units_temp = []
+                        for i in range(0, ORDERBOOK_SIZE):
+                            orderbook_units_temp.append({"ask_price": 0, "bid_price": 0, "ask_size": 0, "bid_size": 0})
 
                         if ask_len > ORDERBOOK_SIZE:
                             for i in range(0, ORDERBOOK_SIZE):
                                 orderbook_units_temp[i].update({"ask_price": float(data['a'][i][0]) * usd_price
-                                                                , "ask_size": data['a'][i][1]})
+                                                                , "ask_size": float(data['a'][i][1])})
                         else:
                             for i in range(0, ask_len):
                                 orderbook_units_temp[i].update({"ask_price": float(data['a'][i][0]) * usd_price
-                                                                , "ask_size": data['a'][i][1]})
+                                                                , "ask_size": float(data['a'][i][1])})
                         j = 0
                         if bid_len > ORDERBOOK_SIZE:
-                            for i in range(bid_len-1, bid_len-1-ORDERBOOK_SIZE,-1):
-                                orderbook_units_temp[j]['bid_price'] = float(data['b'][i][0]) * usd_price
-                                orderbook_units_temp[j]['bid_size'] = data['b'][i][1]
+                            for i in range(bid_len-1, bid_len-1-ORDERBOOK_SIZE, -1):
+                                orderbook_units_temp[j].update({"bid_price": float(data['b'][i][0]) * usd_price
+                                                                , "bid_size": float(data['b'][i][1])})
                                 j += 1
                         else:
-                            for i in range(bid_len-1, -1,-1):
-                                orderbook_units_temp[j]['bid_price'] = float(data['b'][i][0]) * usd_price
-                                orderbook_units_temp[j]['bid_size'] = data['b'][i][1]
+                            for i in range(bid_len-1, -1, -1):
+                                orderbook_units_temp[j].update({"bid_price": float(data['b'][i][0]) * usd_price
+                                                                , "bid_size": float(data['b'][i][1])})
                                 j += 1
 
-                        if ticker not in exchange_price_orderbook:
-                            exchange_price_orderbook[ticker] = {}
+                        if ticker not in orderbook_info:
+                            orderbook_info[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
-                                exchange_price_orderbook[ticker].update({exchange_list: None})
-                                exchange_price_orderbook[ticker][exchange_list] = {"orderbook_units": [None]}
+                                orderbook_info[ticker].update({exchange_list: None})
+                                orderbook_info[ticker][exchange_list] = {"orderbook_units": [None]}
 
                         # 호가 데이터 저장
-                        exchange_price_orderbook[ticker][exchange]["orderbook_units"] = orderbook_units_temp
+                        orderbook_info[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
                         #if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                         #    logging.info('[{}] Time to new connection...'.format(exchange))

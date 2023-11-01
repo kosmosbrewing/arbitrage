@@ -51,8 +51,8 @@ def get_measure_ticker():
         close_ask = float(close_data[1].replace(',', '')) ## 매수(매도(숏) 종료) 평단가
         usd = float(split_data[15])
 
-        if ticker not in "LOOM":
-            continue
+        #if ticker != "MATIC":
+        #    continue
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -61,7 +61,7 @@ def get_measure_ticker():
                                   "front_open_gap": open_gap, "front_close_gap": close_gap}
         if ticker not in position_data:
             position_data[ticker] = {"open_count": 0, "open_check_gap": 0, "position": 0, "position_gap": 0,
-                                    "position_gap_accum": 0, "installment_count": 0}
+                                    "close_count": 0, "position_gap_accum": 0, "installment_count": 0}
         if ticker not in trade_data:
             trade_data[ticker] = {"open_bid_amount": 0, "open_ask_amount": 0, "close_bid_amount": 0, "close_ask_amount": 0,
                                   "trade_quantity": 0, "trade_profit": 0, "profit_count": 0, "total_profit": 0}
@@ -71,21 +71,21 @@ def get_measure_ticker():
         check_data[ticker]['front_open_gap'] = open_gap
         check_data[ticker]['front_close_gap'] = close_gap
 
-        if open_gap - front_open_gap > FRONT_GAP or front_close_gap - close_gap > FRONT_GAP:
-            print(f"{date_time} {ticker} 허수 값 PASS | {open_gap} | {front_open_gap} | {close_gap} | {front_close_gap}")
-            continue
+        #if open_gap - front_open_gap > FRONT_GAP or front_close_gap - close_gap > FRONT_GAP:
+            #print(f"{date_time} {ticker}|허수PASS|{open_gap}|{front_open_gap}|{close_gap}|{front_close_gap}")
+            #continue
 
         ## Open 저점 계산, BTC 김프 보단 낮아야 함 < btc_open_gap
         #if open_gap < check_data[ticker]['open_gap'] and open_gap < btc_open_gap:
         if open_gap < check_data[ticker]['open_gap']:
             # open_gap 이 Update 되면 close_gap은 그 시점으로 gap 수정
-            #print(f"{date_time} {ticker} CURR|{open_gap}|CHECK|{check_data[ticker]['open_gap']} OPEN 갱신")
+            #print(f"{date_time} {ticker}|CURR|{open_gap}|CHECK|{check_data[ticker]['open_gap']} OPEN 갱신")
 
             check_data[ticker].update({"open_gap": open_gap, "open_bid": open_bid, "open_ask": open_ask})
             check_data[ticker].update({"close_gap": close_gap, "close_bid": close_bid, "close_aks": close_ask})
 
             # 진입 시점 금액 계산
-            if position_data[ticker]['open_count'] >= MEASURE_OPEN_COUNT and open_gap < position_data[ticker]['open_check_gap']:
+            if position_data[ticker]['open_count'] >= MEASURE_OPEN_COUNT and open_gap < position_data[ticker]['open_check_gap'] and open_gap - close_gap < CURR_OPEN_CLOSE_GAP:
                 # 매수/매도(숏) 기준 가격 잡기 (개수 계산)
                 trade_price = open_bid if open_bid > open_ask else open_ask
                 trade_quantity = BALANCE * OPEN_INSTALLMENT / trade_price ## 분할 진입을 위해서
@@ -106,24 +106,36 @@ def get_measure_ticker():
                 position_data[ticker]['installment_count'] += 1
                 position_data[ticker]['position_gap_accum'] += open_gap
                 position_data[ticker]['position_gap'] = round(position_data[ticker]['position_gap_accum']
-                                                               / position_data[ticker]['installment_count'], 2)
+                                                              / position_data[ticker]['installment_count'], 2)
                 position_data[ticker]['position'] = 1
-
+                position_data[ticker]['close_count'] = 0
                 trade_data[ticker].update({"open_bid_amount": open_bid_amount, "open_ask_amount": open_ask_amount,
                                            "trade_quantity": trade_quantity})
-                #position_data['main_ticker'] = ticker
+                # position_data['main_ticker'] = ticker
 
                 ### 주문 로직
-                print(f"{date_time} {ticker} 진입|OPEN|{position_data[ticker]['position_gap']}|CLOSE|{check_data[ticker]['close_gap']}"
-                    f"|PROFIT|{trade_data[ticker]['total_profit']}|BALANCE|{remain_bid_balance} ")
-                print(f"{date_time} {ticker} {position_data[ticker]}")
-                print(f"{date_time} {ticker} {trade_data[ticker]}")
+                print(
+                    f"{date_time} {ticker}|진입|CHK|{position_data[ticker]['position_gap']}|OPEN|{open_gap}|CLOSE|{close_gap}"
+                    f"|GAP|{round(close_gap - open_gap, 2)}|PROFIT|{trade_data[ticker]['total_profit']}")
+                # print(f"{date_time} {ticker}|{position_data[ticker]}")
+                # print(f"{date_time} {ticker}|{trade_data[ticker]}")
 
         ## Close 고점 계산
         if close_gap > check_data[ticker]['close_gap']:
             # Close 고점 데이터 갱신
             check_data[ticker].update({"close_gap": close_gap, "close_bid": close_bid, "close_aks": close_ask})
             close_diff_gap = check_data[ticker]['close_gap'] - position_data[ticker]['position_gap']
+
+            check_diff_gap = check_data[ticker]['close_gap'] - check_data[ticker]['open_gap']
+
+            if check_diff_gap > MEASURE_OPEN_GAP:
+                position_data[ticker]['open_count'] += 1
+                position_data[ticker]['open_check_gap'] = check_data[ticker]['open_gap']
+                print(f"{date_time} {ticker}|진입포착|CHK|{check_data[ticker]['open_gap']}|OPEN|{open_gap}"
+                      f"|CLOSE|{close_gap}|"
+                      f"OPEN_COUNT|{position_data[ticker]['open_count']}")
+                position_data[ticker]['close_count'] = 0
+                # check_data[ticker].update({"open_gap": open_gap, "open_bid": open_bid, "open_ask": open_ask})
 
             if close_diff_gap > MEASURE_CLOSE_GAP and position_data[ticker]['position'] == 1:
                 ## 종료 시점 금액 계산
@@ -144,31 +156,44 @@ def get_measure_ticker():
                                            "close_bid_amount": 0, "close_ask_amount": 0,
                                            "trade_quantity": 0, "trade_profit": 0})
 
-                print(f"{date_time} {ticker} 손절|OPEN|{position_data[ticker]['position_gap']}|CLOSE|{check_data[ticker]['close_gap']}"
-                      f"|PROFIT|{trade_data[ticker]['total_profit']}|BALANCE|{remain_bid_balance} ")
-                print(f"{date_time} {ticker} {check_data[ticker]}")
-                print(f"{date_time} {ticker} {trade_data[ticker]}")
+                print(f"{date_time} {ticker}|익절|OPEN|{position_data[ticker]['position_gap']}|CLOSE|{close_gap}"
+                      f"|GAP|{round(close_gap-position_data[ticker]['position_gap'],2)}|PROFIT|{trade_data[ticker]['total_profit']}")
+                #print(f"{date_time} {ticker}|{check_data[ticker]}")
+                #print(f"{date_time} {ticker}|{trade_data[ticker]}")
                 measure_ticker[ticker] = {"units": []}
 
-        
-        check_diff_gap = check_data[ticker]['close_gap'] - check_data[ticker]['open_gap']
-        if check_diff_gap > MEASURE_OPEN_GAP:
-            position_data[ticker]['open_count'] += 1
-            position_data[ticker]['open_check_gap'] = check_data[ticker]['open_gap']
-            print(f"{date_time} {ticker} 변동성 포착 |LOW_OPEN|{check_data[ticker]['open_gap']}|"
-                          f"CURR_CLOSE|{close_gap}|CURR_OPEN|{open_gap}|OPEN_COUNT|{position_data[ticker]['open_count']}")
+        check_stop_loss_gap = position_data[ticker]['position_gap'] - close_gap
+        if position_data[ticker]['position'] == 1 and check_stop_loss_gap > MEASURE_STOP_LOSS:
+            position_data[ticker]['close_count'] += 1
+            print(f"{date_time} {ticker}|손절포착|OPEN|{position_data[ticker]['position_gap'] }|"
+                  f"CLOSE|{close_gap}|GAP|{round(close_gap-position_data[ticker]['position_gap'],2)}|"
+                  f"CLOSE_COUNT|{position_data[ticker]['close_count']}")
+
+        if position_data[ticker]['position'] == 1 and position_data[ticker]['close_count'] >= 3:
+            trade_quantity = trade_data[ticker]['trade_quantity']
+            close_bid_amount = float(close_bid * trade_quantity)
+            close_ask_amount = float(close_ask * trade_quantity)
+            trade_data[ticker].update({"close_bid_amount": close_bid_amount, "close_ask_amount": close_ask_amount})
+            get_ticker_profit(trade_data, ticker)
+
+            # 종료 시점 데이터 갱신
             check_data[ticker].update({"open_gap": open_gap, "open_bid": open_bid, "open_ask": open_ask})
+            check_data[ticker].update({"close_gap": close_gap, "close_bid": close_bid, "close_aks": close_ask})
+            position_data[ticker].update({"open_count": 0, "open_check_gap": 0, "position": 0,
+                                          "close_count": 0,"installment_count": 0, "position_gap_accum": 0})
+            trade_data[ticker].update({"open_bid_amount": 0, "open_ask_amount": 0,
+                                       "close_bid_amount": 0, "close_ask_amount": 0,
+                                       "trade_quantity": 0, "trade_profit": 0})
+            print(f"{date_time} {ticker}|손절|OPEN|{position_data[ticker]['position_gap']}|CLOSE|{close_gap}"
+                  f"|GAP|{round(close_gap-position_data[ticker]['position_gap'],2)}|PROFIT|{trade_data[ticker]['total_profit']}")
 
-        if position_data[ticker]['position'] == 1:
-            check_stop_loss_gap = close_gap - position_data[ticker]['position_gap']
-        
-            if check_stop_loss_gap > MEASURE_STOP_LOSS:
-                print(f"{date_time} {ticker} 손절 필요")
-
+            #print(f"{date_time} {ticker}|{check_data[ticker]}")
+            #print(f"{date_time} {ticker}|{trade_data[ticker]}")
+            measure_ticker[ticker] = {"units": []}
 
     for ticker in measure_ticker:
-        print(f"{date_time} {ticker} 손익 발생!")
-        print(f"{date_time} {ticker} {trade_data[ticker]}")
+        print(f"{date_time} {ticker}|손익 발생!")
+        print(f"{date_time} {ticker}|{trade_data[ticker]}")
 
 def get_ticker_profit(trade_data, ticker):
     open_profit = trade_data[ticker]['close_bid_amount'] - trade_data[ticker]['open_bid_amount']
