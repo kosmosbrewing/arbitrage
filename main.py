@@ -20,6 +20,7 @@ class Premium:
         self.exchange_price = {}  # 거래소별 가격 데이터를 저장할 딕셔너리
         self.orderbook_info = {}  # 거래소별 호가 데이터 저장
         self.orderbook_check = {}
+        self.socket_connect = [0, 0]
         util.setup_logging()
 
     async def run(self):
@@ -29,15 +30,10 @@ class Premium:
 
         await asyncio.wait([
             asyncio.create_task(self.get_usd_price())
-            , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchange_price, self.orderbook_info))
-            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_price, self.orderbook_info))
-            , asyncio.create_task(comparePrice.compare_price(self.exchange_price, self.orderbook_check))
-            , asyncio.create_task(checkOrderbook.check_orderbook(self.orderbook_info, self.orderbook_check))
-
-            # , asyncio.create_task(upbit.connect_socket_spot_ticker(self.exchange_price))
-            # , asyncio.create_task(binance.connect_socket_spot_ticker(self.exchange_price))
-            # , asyncio.create_task(binance.connect_socket_futures_ticker(self.exchange_price))
-            #, asyncio.create_task(self.time_diff_checker())
+            , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchange_price, self.orderbook_info, self.socket_connect))
+            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_price, self.orderbook_info, self.socket_connect))
+            , asyncio.create_task(comparePrice.compare_price(self.exchange_price, self.orderbook_check, self.socket_connect))
+            , asyncio.create_task(checkOrderbook.check_orderbook(self.orderbook_info, self.orderbook_check, self.socket_connect))
         ])
 
     async def get_usd_price(self):

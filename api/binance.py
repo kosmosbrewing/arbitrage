@@ -25,7 +25,6 @@ def get_all_book_ticker():
 
 async def connect_socket_spot_ticker(exchange_price):
     """Binance 소켓연결"""
-    global exchange
     exchange = BINANCE
 
     logging.info(f"{exchange} connect_socket")
@@ -100,7 +99,6 @@ async def connect_socket_spot_ticker(exchange_price):
 
 async def connect_socket_futures_ticker(exchange_price):
     """Binance 소켓연결"""
-    global exchange
     exchange = BINANCE
     logging.info(f"{exchange} connect_socket")
     while True:
@@ -179,9 +177,8 @@ async def connect_socket_futures_ticker(exchange_price):
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
 
-async def connect_socket_futures_orderbook(exchange_price, orderbook_info):
+async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socket_connect):
     """Binance 소켓연결"""
-    global exchange
     exchange = BINANCE
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket")
@@ -189,12 +186,12 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info):
         try:
             await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            #util.clear_orderbook_info(exchange, orderbook_info)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
                                           ping_timeout=SOCKET_PING_TIMEOUT, max_queue=10000) as websocket):
-                logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook)")
+                socket_connect[1] = 1
+                logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook) | Socket Connect: {socket_connect[1]}")
 
                 params_ticker = []
                 tickers = get_all_book_ticker()
@@ -268,10 +265,6 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info):
                         # 호가 데이터 저장
                         orderbook_info[ticker][exchange]["orderbook_units"] = orderbook_units_temp
 
-                        #if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
-                        #    logging.info('[{}] Time to new connection...'.format(exchange))
-                        #    await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
-                        #    break
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
@@ -282,6 +275,9 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info):
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             break
+                socket_connect[1] = 0
+                orderbook_info = {}
+                logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect[1]}")
                 await websocket.close()
         except socket.gaierror:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")

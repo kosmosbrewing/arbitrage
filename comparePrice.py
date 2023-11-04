@@ -4,7 +4,7 @@ import traceback
 import logging
 from consts import *
 
-async def compare_price(exchange_price, orderbook_check):
+async def compare_price(exchange_price, orderbook_check, socket_connect):
     """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     await asyncio.sleep(COMPARE_PRICE_START_DELAY)
     await util.send_to_telegram("✅ 가격비교 시작")
@@ -15,6 +15,11 @@ async def compare_price(exchange_price, orderbook_check):
             await asyncio.sleep(COMPARE_PRICE_DELAY)  # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
             message_dict = {}  # 갭 발생시 알람을 보낼 메시지를 저장해둘 딕셔너리
             message_list = [""]  # message_dict에 저장했던 메시지들을 보낼 순서대로 저장한 리스트
+
+            socket_check = sum(socket_connect)
+            if socket_check < 2:
+                logging.info(f"Socket 연결 끊어짐 : {socket_check}, comparePrice PASS")
+                continue
 
             for ticker in orderbook_check:
                 if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외

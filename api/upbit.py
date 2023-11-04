@@ -31,7 +31,6 @@ def get_usd_price(exchange_price):
 
 async def connect_socket_spot_ticker(exchange_price):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
-    global exchange
     exchange = UPBIT
 
     logging.info(f"{exchange} connect_socket")
@@ -113,9 +112,8 @@ async def connect_socket_spot_ticker(exchange_price):
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
 
-async def connect_socket_spot_orderbook(exchange_price, orderbook_info):
+async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
-    global exchange
     exchange = UPBIT
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket_orderbook")
@@ -128,7 +126,8 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info):
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://api.upbit.com/websocket/v1',
                                           ping_interval=None, ping_timeout=30, max_queue=10000) as websocket):
-                logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook)")
+                socket_connect[0] = 1
+                logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook) | Socket Connect: {socket_connect[0]}")
 
                 subscribe_fmt = [
                     {'ticket': str(uuid.uuid4())[:6]},
@@ -209,6 +208,9 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info):
                             break
                     except:
                         logging.error(traceback.format_exc())
+                socket_connect[0] = 0
+                orderbook_info = {}
+                logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect[0]}")
                 await websocket.close()
         except socket.gaierror:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")

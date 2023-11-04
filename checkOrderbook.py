@@ -3,13 +3,18 @@ import traceback
 import logging
 from consts import *
 
-async def check_orderbook(orderbook_info, orderbook_check):
+async def check_orderbook(orderbook_info, orderbook_check, socket_connect):
     await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
 
     while True:
         try:
             # 루프 무한으로 실행되어 다른 작업 못하는 것 방지
             await asyncio.sleep(0.1)
+
+            socket_check = sum(socket_connect)
+            if socket_check < 2:
+                logging.info(f"Socket 연결 끊어짐 : {socket_check}, checkOrderbook 초기화")
+                continue
 
             # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
             for ticker in orderbook_info:
