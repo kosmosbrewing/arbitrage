@@ -32,9 +32,40 @@ class Premium:
             asyncio.create_task(self.get_usd_price())
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchange_price, self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_price, self.orderbook_info, self.socket_connect))
-            , asyncio.create_task(comparePrice.compare_price(self.exchange_price, self.orderbook_check, self.socket_connect))
-            , asyncio.create_task(checkOrderbook.check_orderbook(self.orderbook_info, self.orderbook_check, self.socket_connect))
+            , asyncio.create_task(self.compare_price())
+            , asyncio.create_task(self.check_orderbook())
         ])
+
+    async def compare_price(self):
+        await asyncio.sleep(COMPARE_PRICE_START_DELAY)
+        logging.info("가격 비교 시작!")
+        while True:
+            try:
+                await asyncio.sleep(COMPARE_PRICE_DELAY)
+                orderbook_check = self.orderbook_check.copy()
+                exchange_price = self.exchange_price.copy()
+                socket_connect = self.socket_connect.copy()
+
+                if sum(socket_connect) < 2:
+                    print(f"Socket 연결 끊어 짐(정상 2) : {sum(socket_connect)}, compare_price PASS!")
+                elif sum(socket_connect) == 2:
+                    comparePrice.compare_price(exchange_price, orderbook_check)
+
+            except Exception as e:
+                logging.info(traceback.format_exc())
+                await util.send_to_telegram(traceback.format_exc())
+
+    async def check_orderbook(self):
+        await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
+        while True:
+            try:
+                await asyncio.sleep(0.1)
+                orderbook_info = self.orderbook_info.copy()
+                checkOrderbook.check_orderbook(orderbook_info, self.orderbook_check)
+
+            except Exception as e:
+                logging.info(traceback.format_exc())
+                await util.send_to_telegram(traceback.format_exc())
 
     async def get_usd_price(self):
         """ 두나무 API를 이용해 달러가격을 조회하는 함수
@@ -42,7 +73,7 @@ class Premium:
         while True:
             try:
                 upbit.get_usd_price(self.exchange_price)
-                await asyncio.sleep(DOLLAR_UPDATE)  # 달러가격 업데이트 주기, 1시간
+                await asyncio.sleep(DOLLAR_UPDATE)
             except Exception as e:
                 await util.send_to_telegram(traceback.format_exc())
 
