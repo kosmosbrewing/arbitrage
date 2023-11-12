@@ -5,9 +5,10 @@ import asyncio
 import aiohttp
 import logging
 import datetime
+import json
+import os
 from consts import *
-import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 bot = None
 chat_id_list = None
@@ -94,12 +95,10 @@ async def send_to_telegram_image(image):
     global bot
     global chat_id_list
 
+    message = '[News Coo 🦤]\n🔵진입김프(Upbit ↑/Binance ↓)|🔴탈출김프(Upbit ↓/Binance ↑)|\n⚫️Bitcoin진입김프(Upbit ↑/Binance ↓)'
     if chat_id_list is None:
         chat_id_list = await get_chat_id()
-        #logging.info(f"Telegram Chat ID 값 취득 : {get_chat_id()}")
-        # chat_id_list = ['1109591824'] # 준우
         chat_id_list = ['1109591824', '2121677449']  #
-        #chat_id_list = ['2121677449']  # 규빈
         logging.info(f"Telegram Chat ID 값 취득 : {chat_id_list}")
 
     if bot is None:
@@ -110,6 +109,7 @@ async def send_to_telegram_image(image):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
+                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 await bot.send_photo(chat_id, photo=open(image, 'rb'))
                 break
             except telegram.error.TimedOut as e:
@@ -149,3 +149,61 @@ def is_need_reset_socket(start_time):
         return True
     else:
         return
+
+def load_remain_position(position_data, trade_data):
+    if ENV == 'real':
+        get_position_path = '/root/arbitrage/conf/position_data'
+    elif ENV == 'local':
+        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data'
+
+    if os.path.exists(get_position_path):
+        with open(get_position_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            split_data = line.split('|')
+            ticker = split_data[0]
+            type = split_data[1]
+            data = split_data[2]
+            if type == 'POSITION':
+                position_data[ticker] = json.loads(data)
+            elif type == 'TRADE':
+                trade_data[ticker] = json.loads(data)
+
+    else:
+        print(f"{get_position_path} 파일이 존재하지 않습니다.")
+
+def put_remain_position(ticker, position_data, trade_data):
+    if ENV == 'real':
+        put_position_path = '/root/arbitrage/conf/position_data'
+    elif ENV == 'local':
+        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data'
+
+    put_data = ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
+    put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|"
+
+    with open(put_position_path, 'w') as file:
+        file.write(put_data)
+
+def load_history_data():
+    # 오늘 날짜 가져오기
+    today = datetime.date.today()
+    # 하루 전 날짜 계산
+    yesterday = today - datetime.timedelta(days=1)
+    yesterday = yesterday.strftime("%Y%m%d")
+
+    if ENV == 'real':
+        history_file_path = '/root/arbitrage/log/premium_data_'+yesterday
+    elif ENV == 'local':
+        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_'+yesterday
+        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231107'
+        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231110'
+
+    if os.path.exists(history_file_path):
+        print(history_file_path)
+        with open(history_file_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+    else:
+        print(f"{history_file_path} 파일이 존재하지 않습니다.")
+
+    return lines
