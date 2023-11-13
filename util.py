@@ -13,6 +13,13 @@ from datetime import timedelta
 bot = None
 chat_id_list = None
 
+# 오늘 날짜 가져오기
+now_date = datetime.date.today()
+today = now_date.strftime("%Y%m%d")
+# 하루 전 날짜 계산
+yesterday = now_date - datetime.timedelta(days=1)
+yesterday = yesterday.strftime("%Y%m%d")
+
 def setup_logging():
     logging.basicConfig(level=logging.INFO)
     # TimedRotatingFileHandler를 설정하여 날짜별로 로그 파일을 회전
@@ -95,7 +102,7 @@ async def send_to_telegram_image(image):
     global bot
     global chat_id_list
 
-    message = '[News Coo 🦤]\n🔵진입김프(Upbit ↑/Binance ↓)|🔴탈출김프(Upbit ↓/Binance ↑)|\n⚫️Bitcoin진입김프(Upbit ↑/Binance ↓)'
+    message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
     if chat_id_list is None:
         chat_id_list = await get_chat_id()
         chat_id_list = ['1109591824', '2121677449']  #
@@ -152,52 +159,50 @@ def is_need_reset_socket(start_time):
 
 def load_remain_position(position_data, trade_data):
     if ENV == 'real':
-        get_position_path = '/root/arbitrage/conf/position_data'
+        get_position_path = '/root/arbitrage/conf/position_data_' + yesterday
     elif ENV == 'local':
-        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data'
+        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data_' + yesterday
 
     if os.path.exists(get_position_path):
         with open(get_position_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
 
         for line in lines:
-            split_data = line.split('|')
-            ticker = split_data[0]
-            type = split_data[1]
-            data = split_data[2]
-            if type == 'POSITION':
-                position_data[ticker] = json.loads(data)
-            elif type == 'TRADE':
-                trade_data[ticker] = json.loads(data)
-
+            try:
+                split_data = line.split('|')
+                ticker = split_data[0]
+                type = split_data[1]
+                data = split_data[2]
+                if type == 'POSITION':
+                    position_data[ticker] = json.loads(data)
+                    print(f"{ticker}|FILE_LOAD|{position_data[ticker] }")
+                elif type == 'TRADE':
+                    trade_data[ticker] = json.loads(data)
+                    print(f"{ticker}|FILE_LOAD|{trade_data[ticker]}")
+            except:
+                continue
     else:
         print(f"{get_position_path} 파일이 존재하지 않습니다.")
 
 def put_remain_position(ticker, position_data, trade_data):
     if ENV == 'real':
-        put_position_path = '/root/arbitrage/conf/position_data'
+        put_position_path = '/root/arbitrage/conf/position_data_' + today
     elif ENV == 'local':
-        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data'
+        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data_' + today
 
     put_data = ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
-    put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|"
+    put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
 
-    with open(put_position_path, 'w') as file:
+    with open(put_position_path, 'a') as file:
         file.write(put_data)
 
 def load_history_data():
-    # 오늘 날짜 가져오기
-    today = datetime.date.today()
-    # 하루 전 날짜 계산
-    yesterday = today - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime("%Y%m%d")
-
     if ENV == 'real':
         history_file_path = '/root/arbitrage/log/premium_data_'+yesterday
     elif ENV == 'local':
         history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_'+yesterday
         #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231107'
-        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231110'
+        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data'
 
     if os.path.exists(history_file_path):
         print(history_file_path)
