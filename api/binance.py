@@ -1,5 +1,5 @@
 import hashlib
-
+import ujson
 import requests
 from consts import *
 import util
@@ -8,7 +8,6 @@ import websockets
 import json
 import socket
 import logging
-import uuid
 import os
 import time
 import hmac
@@ -28,7 +27,6 @@ def get_all_book_ticker():
     res = res.json()
     return [s['symbol'].lower() + "@depth" for s in res['symbols'] if "USDT" in s['symbol']]
 
-@profile
 def futures_order(ticker, side, quantity):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
@@ -67,7 +65,6 @@ def futures_order(ticker, side, quantity):
     #res = requests.post(server_url, headers=headers)
     #print(res.text)
 
-@profile
 async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socket_connect):
     """Binance 소켓연결"""
     exchange = BINANCE
@@ -107,7 +104,7 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socke
                 while True:
                     try:
                         data = await asyncio.wait_for(websocket.recv(), 10)
-                        data = json.loads(data)
+                        data = ujson.loads(data)
 
                         ticker = data['s'].replace("USDT", "") if 's' in data else None
 
@@ -122,38 +119,35 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socke
                         ask_len = len(data['a'])
                         bid_len = len(data['b'])
 
-                        orderbook_units_temp = []
-                        for i in range(0, ORDERBOOK_SIZE):
-                            orderbook_units_temp.append({"ask_price": 0, "bid_price": 0, "ask_size": 0, "bid_size": 0})
-
-                        if ask_len > ORDERBOOK_SIZE:
-                            for i in range(0, ORDERBOOK_SIZE):
-                                orderbook_units_temp[i]['ask_price'] = float(data['a'][i][0]) * usd_price
-                                orderbook_units_temp[i]['ask_size'] = data['a'][i][1]
-                        else:
-                            for i in range(0, ask_len):
-                                orderbook_units_temp[i]['ask_price'] = float(data['a'][i][0]) * usd_price
-                                orderbook_units_temp[i]['ask_size'] = data['a'][i][1]
-                        j = 0
-                        if bid_len > ORDERBOOK_SIZE:
-                            for i in range(bid_len-1, bid_len-1-ORDERBOOK_SIZE, -1):
-                                orderbook_units_temp[j]['bid_price'] = float(data['b'][i][0]) * usd_price
-                                orderbook_units_temp[j]['bid_size'] = data['b'][i][1]
-                                j += 1
-                        else:
-                            for i in range(bid_len-1, -1, -1):
-                                orderbook_units_temp[j]['bid_price'] = float(data['b'][i][0]) * usd_price
-                                orderbook_units_temp[j]['bid_size'] = data['b'][i][1]
-                                j += 1
-
                         if ticker not in orderbook_info:
                             orderbook_info[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
                                 orderbook_info[ticker].update({exchange_list: None})
-                                orderbook_info[ticker][exchange_list] = {"orderbook_units": [None]}
+                                orderbook_info[ticker][exchange_list] = {"orderbook_units": []}
 
-                        # 호가 데이터 저장
-                        orderbook_info[ticker][exchange]["orderbook_units"] = orderbook_units_temp
+                                for i in range(0, ORDERBOOK_SIZE):
+                                    orderbook_info[ticker][exchange_list]["orderbook_units"].append({"ask_price": 0, "bid_price": 0, "ask_size": 0, "bid_size": 0})
+
+                        if ask_len > ORDERBOOK_SIZE:
+                            for i in range(0, ORDERBOOK_SIZE):
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_size'] = data['a'][i][1]
+                        else:
+                            for i in range(0, ask_len):
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_size'] = data['a'][i][1]
+                        j = 0
+                        if bid_len > ORDERBOOK_SIZE:
+                            for i in range(bid_len-1, bid_len-1-ORDERBOOK_SIZE, -1):
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_size'] = data['b'][i][1]
+                                j += 1
+                        else:
+                            for i in range(bid_len-1, -1, -1):
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_size'] = data['b'][i][1]
+                                j += 1
+
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
                             logging.info(f"환율: {usd_price}")

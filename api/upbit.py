@@ -1,6 +1,5 @@
 import traceback
 import pyupbit
-import requests
 from consts import *
 import util
 import asyncio
@@ -13,6 +12,7 @@ import hashlib
 import os
 import requests
 import uuid
+import ujson
 from urllib.parse import urlencode, unquote
 from datetime import datetime
 
@@ -33,7 +33,6 @@ def get_usd_price(exchange_price):
     exchange_price["USD"] = {'base': data[0]['basePrice']}
     logging.info('환율정보 조회 : [{}]'.format(exchange_price["USD"]))
 
-@profile
 def check_order(recv_uuid):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
@@ -72,7 +71,6 @@ def check_order(recv_uuid):
     print(res.json())
     return data['executed_volume']
 
-@profile
 def spot_order(ticker, side, price, volume):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
@@ -120,7 +118,6 @@ def spot_order(ticker, side, price, volume):
     return quantity
 
 
-@profile
 async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
@@ -155,7 +152,7 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
                 while True:
                     try:
                         data = await asyncio.wait_for(websocket.recv(), 10)
-                        data = json.loads(data)
+                        data = ujson.loads(data)
 
                         if 'code' not in data: # 응답 데이터(딕셔너리)에 code가 없는 경우 제외
                             logging.info(f"{exchange} [Data error] : {data}")
@@ -168,43 +165,32 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
 
                         base_ticker = data['code'].split('-')[0] # KRW-BTC > KRW(기준통화)
                         ticker = data['code'].split('-')[1]     # KRW-BTC > BTC(시세조회대코인)
-
-                        orderbook_units_temp = []
                         orderbook_len = len(data['orderbook_units'])
-
-                        for i in range(0,ORDERBOOK_SIZE):
-                            orderbook_units_temp.append({"ask_price" : 0, "bid_price" : 0, "ask_size" : 0, "bid_size" : 0 })
-
-                        if orderbook_len > ORDERBOOK_SIZE:
-                            for i in range(0, ORDERBOOK_SIZE):
-                                if base_ticker == "BTC":
-                                    data['orderbook_units'][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
-                                    data['orderbook_units'][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
-                                    orderbook_units_temp[i] = data['orderbook_units'][i]
-                                else:
-                                    orderbook_units_temp[i] = data['orderbook_units'][i]
-                        else:
-                            for i in range(0, orderbook_len):
-                                if base_ticker == "BTC":
-                                    data['orderbook_units'][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
-                                    data['orderbook_units'][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
-                                    orderbook_units_temp[i] = data['orderbook_units'][i]
-                                else:
-                                    orderbook_units_temp[i] = data['orderbook_units'][i]
 
                         if ticker not in orderbook_info:
                             orderbook_info[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
                                 orderbook_info[ticker].update({exchange_list: None})
-                                orderbook_info[ticker][exchange_list] = {"orderbook_units": [None]}
+                                orderbook_info[ticker][exchange_list] = {"orderbook_units": []}
+                                for i in range(0, ORDERBOOK_SIZE):
+                                    orderbook_info[ticker][exchange_list]["orderbook_units"].append({"ask_price": 0, "bid_price": 0, "ask_size": 0, "bid_size": 0})
 
-                        # 호가 데이터 저장
-                        orderbook_info[ticker][exchange]["orderbook_units"] = orderbook_units_temp
-
-                        #if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
-                        #    logging.info('[{}] Time to new connection...'.format(exchange))
-                        #    await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
-                        #    break
+                        if orderbook_len > ORDERBOOK_SIZE:
+                            for i in range(0, ORDERBOOK_SIZE):
+                                if base_ticker == "BTC":
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
+                                else:
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i] = data['orderbook_units'][i]
+                        else:
+                            for i in range(0, orderbook_len):
+                                if base_ticker == "BTC":
+                                    #data['orderbook_units'][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
+                                    #data['orderbook_units'][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
+                                else:
+                                    orderbook_info[ticker][exchange]["orderbook_units"][i] = data['orderbook_units'][i]
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
