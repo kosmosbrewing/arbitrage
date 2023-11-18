@@ -33,6 +33,46 @@ def get_usd_price(exchange_price):
     exchange_price["USD"] = {'base': data[0]['basePrice']}
     logging.info('환율정보 조회 : [{}]'.format(exchange_price["USD"]))
 
+@profile
+def check_order(recv_uuid):
+    access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
+    secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
+    server_url = 'https://api.upbit.com'
+    params = {
+        'uuid': '00000000-0000-0000-0000-000000000000'
+    }
+    print(params)
+
+    params = {
+        'uuid': recv_uuid
+    }
+    print(params)
+
+    query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
+    m = hashlib.sha512()
+    m.update(query_string)
+    query_hash = m.hexdigest()
+
+    payload = {
+        'access_key': access_key,
+        'nonce': str(uuid.uuid4()),
+        'query_hash': query_hash,
+        'query_hash_alg': 'SHA512',
+    }
+
+    jwt_token = jwt.encode(payload, secret_key)
+    authorization = 'Bearer {}'.format(jwt_token)
+    headers = {
+        'Authorization': authorization,
+    }
+
+    res = requests.get(server_url + '/v1/order', params=params, headers=headers)
+    data = res.json()
+
+    print(res.json())
+    return data['executed_volume']
+
+@profile
 def spot_order(ticker, side, price, volume):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
@@ -70,11 +110,17 @@ def spot_order(ticker, side, price, volume):
         'Authorization': authorization,
     }
     #res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
-    #res.json()
-
+    #data = res.json()
     #print(res.json())
 
+    json_str = '{"uuid": "dcc337eb-1453-4f03-b83d-fe5f50748b6d"}'
+    data = json.loads(json_str)
 
+    quantity = check_order(data['uuid'])
+    return quantity
+
+
+@profile
 async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
@@ -82,7 +128,7 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
     logging.info(f"{exchange} connect_socket_orderbook")
     while True:
         try:
-            await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
+            #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
             #util.clear_orderbook_info(exchange, orderbook_info)
 
@@ -188,7 +234,7 @@ async def connect_socket_spot_ticker(exchange_price):
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
-            await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
+            #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
             util.clear_exchange_price(exchange, exchange_price)
 
@@ -242,7 +288,7 @@ async def connect_socket_spot_ticker(exchange_price):
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             logging.info('[{}] Time to new connection...'.format(exchange))
-                            await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
+                            #await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
@@ -266,4 +312,4 @@ async def connect_socket_spot_ticker(exchange_price):
 
 
 if __name__ == "__main__":
-    spot_order('XRP', 'ask', '10000', '10')
+    spot_order('XRP', 'bid', '5000', '10')

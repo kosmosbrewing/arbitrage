@@ -28,6 +28,7 @@ def get_all_book_ticker():
     res = res.json()
     return [s['symbol'].lower() + "@depth" for s in res['symbols'] if "USDT" in s['symbol']]
 
+@profile
 def futures_order(ticker, side, quantity):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
@@ -66,6 +67,7 @@ def futures_order(ticker, side, quantity):
     #res = requests.post(server_url, headers=headers)
     #print(res.text)
 
+@profile
 async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socket_connect):
     """Binance 소켓연결"""
     exchange = BINANCE
@@ -73,7 +75,7 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socke
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
-            await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
+            #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
@@ -181,7 +183,7 @@ async def connect_socket_spot_ticker(exchange_price):
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
-            await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
+            #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
             util.clear_exchange_price(exchange, exchange_price)
 
@@ -225,7 +227,7 @@ async def connect_socket_spot_ticker(exchange_price):
                                         exchange_price['USD']['base'] if 'USD' in exchange_price else 0
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
-                            await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
+                            #await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
@@ -254,7 +256,7 @@ async def connect_socket_futures_ticker(exchange_price):
     logging.info(f"{exchange} connect_socket")
     while True:
         try:
-            await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
+            #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
             util.clear_exchange_price(exchange, exchange_price)
 
@@ -306,7 +308,7 @@ async def connect_socket_futures_ticker(exchange_price):
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             logging.info('[{}] Time to new connection...'.format(exchange))
-                            await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
+                            #await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
                             break
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):

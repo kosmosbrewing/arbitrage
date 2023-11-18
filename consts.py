@@ -15,7 +15,7 @@ TELEGRAM_BOT_TOKEN = "6690231866:AAEUWgkWPaML-tx8VplLo4BPE9tabyq-9i8"
 TELEGRAM_MESSAGE_MAX_SIZE = 4095
 
 # DELAY
-DOLLAR_UPDATE = 5 * 60 # 달러가격 업데이트 주기, 1시간
+DOLLAR_UPDATE = 5 * 60 # 달러가격 업데이트 주기, 5분
 SOCKET_ORDERBOOK_DELAY = 30
 COMPARE_PRICE_START_DELAY = 2 * 60
 COMPARE_PRICE_DELAY = 10 # 가격비교 최초 실행대기, 5분
@@ -23,18 +23,27 @@ CHECK_ORDERBOOK_START_DELAY = 2 * 60 # 호가창 계산 실행대기
 TIME_DIFF_CHECK_DELAY = 30 * 60 # 바이낸스 서버와 시간비교 주기, 30분
 ORDERBOOK_SIZE = 6 # 호가 상하방 몇틱 저장할 지 지정
 
-# MEASURE
-MEASURE_OPEN_COUNT = 2
-MEASURE_OPEN_GAP = 0.33
-MEASURE_CLOSE_GAP = 1.5
-OPEN_INSTALLMENT = 0.33
-MEASURE_STOP_LOSS = 4
-CURR_OPEN_CLOSE_GAP = 0.3
-FRONT_GAP = 10
+CURR_GIMP_GAP = 0.2  # 현재 진입/종료 김프 차이
+# 포지션 진입 조건           #
+OPEN_INSTALLMENT = 0.1  # 분할 매수 (ex 0.1 - 10분할)
+OPEN_GIMP_GAP = 0.3  # 변동성 COUNT 할 김프 조건 (ex. 현재 종료 김프 - 저점 진입 김프 = 0.3)
+OPEN_GIMP_COUNT = 3  # 변동성 COUNT 횟수
+INSTALL_WEIGHT = 0.7 # 분할 진입 가중치
+FRONT_OPEN_COUNT = 200  # 직전 변동성 COUNT 확인 횟수 (ex. 직전 20개 확인)
+FRONT_AVERAGE_COUNT = 200  # 직전 진입 평균 김프 확인 횟수 (ex. 직전 10개 확인)
+# 포지션 종료 조건           #
+CLOSE_GIMP_GAP = 0.5  # 포지션 종료 조건 ( 현재 종료 김프 - 포지션 진입 김프 = 0.8)
+CLOSE_INSTALLMENT = 0.25
+BTC_GAP = 1.5
+
+# STOP_LOSS_GIMP_GAP = 4  # 손절 확인 김프
+# STOP_LOSS_COUNT = 3  # 손절 확인 횟수
 
 # ETC
+POSITION_PROFIT_UPDATE = 60 * 60
 MILLION = 100000000 # 억
 BALANCE = 10000000 # 천만원
 UPBIT_FEE = 0.0005
 BINANCE_FEE = 0.0004
 NOTI_GAP_STANDARD = 0.1 # TODO 거래소간 차이가 발생할 때 알림을 보낼 기준(%) 개인별로 설정
+## 진입 로직

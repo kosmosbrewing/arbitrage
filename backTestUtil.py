@@ -2,18 +2,22 @@ from logging.handlers import TimedRotatingFileHandler
 import logging
 import datetime
 import os
-import json
 from consts import *
 
 bot = None
 chat_id_list = None
-
+# 오늘 날짜 가져오기
+now_date = datetime.date.today()
+today = now_date.strftime("%Y%m%d")
+# 하루 전 날짜 계산
+yesterday = now_date - datetime.timedelta(days=1)
+yesterday = yesterday.strftime("%Y%m%d")
 
 def setup_logging():
     logging.basicConfig(level=logging.INFO)
     # TimedRotatingFileHandler를 설정하여 날짜별로 로그 파일을 회전
     if ENV == 'real':
-        log_file_path = '/root/arbitrage/log/backtest.log'
+        log_file_path = '/root/arbitrage/log/backtest.log_' + today
     elif ENV == 'local':
         log_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/backtest.log'
 
@@ -37,17 +41,11 @@ def setup_logging():
 
 def load_history_data():
     # 오늘 날짜 가져오기
-
-    today = datetime.date.today()
-    # 하루 전 날짜 계산
-    yesterday = today - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime("%Y%m%d")
-
     if ENV == 'real':
         history_file_path = '/root/arbitrage/log/premium_data_' + yesterday
 
     elif ENV == 'local':
-        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data'
+        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_' + yesterday
 
     if os.path.exists(history_file_path):
         print(history_file_path)

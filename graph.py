@@ -7,6 +7,7 @@ from measure import *
 
 async def make_graph():
     today = datetime.date.today()
+
     # 하루 전 날짜 계산
     yesterday = today - datetime.timedelta(days=1)
     yesterday = yesterday.strftime("%Y%m%d")
@@ -90,13 +91,13 @@ async def make_graph():
         plt.subplot(subplot_loc[figure_idx][subplot_idx]) # 그래프 위치
         plt.title(graph_ticker + '_' + yesterday)
 
-        plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
-        plt.plot(close_gap, label='close', color='red', linewidth=0.6)
-        plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
+        #plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
+        #plt.plot(close_gap, label='close', color='red', linewidth=0.6)
+        #plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
 
         plt.xlabel('time')
         plt.ylabel('gap')
-        '''
+
         plt.plot(time, open_gap, label='open', color='blue', linewidth=0.6)
         plt.plot(time, close_gap, label='close', color='red', linewidth=0.6)
         plt.plot(time, btc_open_gap, label='open', color='black', linewidth=0.6)
@@ -105,7 +106,7 @@ async def make_graph():
                          time[round(time_len*4/6)], time[round(time_len*5/6)], time[time_len-1]]
         plt.xticks(show_x_values)
         for val in show_x_values:
-            plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)'''
+            plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)
 
         subplot_idx += 1
 
@@ -121,9 +122,9 @@ async def make_graph():
         image_set.append(image_temp)
         plt.savefig(image_temp, format='png')
 
-    plt.show()
-    #for image in image_set:
-        #await util.send_to_telegram_image(image)
+    #plt.show()
+    for image in image_set:
+        await util.send_to_telegram_image(image)
 
 if __name__ == "__main__":
     asyncio.run(make_graph())

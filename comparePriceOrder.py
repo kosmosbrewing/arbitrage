@@ -1,19 +1,21 @@
 import util
 import logging
 from collections import deque
-from datetime import datetime
-from api import upbit, binance
 from consts import *
+
+@profile
 async def compare_price_order(orderbook_check, remain_bid_balance, check_data, trade_data,
                                                position_data, accum_ticker_count, accum_ticker_data):
     """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
+    base_exchange = UPBIT
+    compare_exchange = BINANCE
+
     for ticker in orderbook_check:
-        if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
+        if ticker in ["USD"]:  # 스테이블코인은 비교 제외
             continue
 
         # 해당 코인이 상장되어 있는 거래소 목록
-        base_exchange = UPBIT
-        compare_exchange = BINANCE
+
         # 가격 정보가 없으면 pass
         if orderbook_check[ticker][base_exchange] is None or orderbook_check[ticker][compare_exchange] is None:
             continue
@@ -83,8 +85,12 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                 accum_ticker_count[ticker].append(0)
                 continue
 
-            if remain_bid_balance < 0:
+            if remain_bid_balance['balance'] < 0:
                 continue
+
+            logging.info(f"{ticker}|GIMP|{open_gimp}/{check_data[ticker]['open_gimp']}|BTC_GIMP|{btc_open_gimp}|"
+                  f"|COUNT|{sum(accum_ticker_count[ticker])}"
+                  f"|OPEN|{open_bid}/{open_ask}|CLOSE|{close_bid}/{close_ask}")
 
             ## 현재 김프가 저점일 때
             if open_gimp < check_data[ticker]['open_gimp']:
@@ -110,9 +116,9 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                 open_ask_price = open_ask * open_quantity + trade_data[ticker]['open_ask_price'] ## 누적 매도 금액
 
                 # 잔고 부족할 시 PASS
-                if remain_bid_balance - open_bid * open_quantity > 0:
-                    logging.info(f"TEST !!!!!! {remain_bid_balance} - {open_bid * open_quantity}")
-                    remain_bid_balance -= open_bid * open_quantity
+                if remain_bid_balance['balance'] - open_bid * open_quantity > 0:
+                    #logging.info(f"TEST !!!!!! {remain_bid_balance['balance']} - {open_bid * open_quantity}")
+                    remain_bid_balance['balance'] -= open_bid * open_quantity
                 else:
                     continue
 
@@ -144,7 +150,7 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                            f"|BTC_OPEN_GIMP|{round(btc_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
                            f"|INSATLL|{position_data[ticker]['open_install_count']}|BID_PRICE|{trade_data[ticker]['open_bid_price']}"
                            f"|TRD_QUANTITY|{trade_data[ticker]['open_quantity']}|TOT_QUANTITY|{trade_data[ticker]['total_quantity']}"
-                           f"|BALANCE|{round(remain_bid_balance, 2)}")
+                           f"|BALANCE|{round(remain_bid_balance['balance'], 2)}")
                 ### 주문 로직
                 logging.info(message)
                 await util.send_to_telegram("🔵진입\n" + message)
@@ -206,8 +212,8 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
 
                     # 손익 갱신
                     get_ticker_profit(trade_data, open_profit, close_profit, total_fee, ticker)
-                    logging.info(f"TEST !!!!!! {remain_bid_balance} + {install_open_bid_price}")
-                    remain_bid_balance += install_open_bid_price
+                    logging.info(f"TEST !!!!!! {remain_bid_balance['balance']} + {install_open_bid_price}")
+                    remain_bid_balance['balance'] += install_open_bid_price
 
                     upbit_market = 'KRW-' + ticker
                     upbit_side = 'ask'
@@ -227,7 +233,7 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                                f"|C_INSTALL|{position_data[ticker]['close_install_count']}|O_INSTALL|{position_data[ticker]['open_install_count']}"
                                f"|C_PROFIT|{trade_data[ticker]['trade_profit']}|T_PROFIT|{trade_data[ticker]['total_profit']}"
                                f"|TRD_QUANTITY|{close_quantity}|TOT_QUANTITY|{trade_data[ticker]['total_quantity']}"
-                               f"|BALANCE|{round(remain_bid_balance, 2)}")
+                               f"|BALANCE|{round(remain_bid_balance['balance'], 2)}")
                     logging.info(message)
                     await util.send_to_telegram("🔴탈출\n" + message)
 

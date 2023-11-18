@@ -97,4 +97,3 @@ def compare_price(exchange_price, orderbook_check):
     #for message in message_list:
     #    await util.send_to_telegram(message)
 
-

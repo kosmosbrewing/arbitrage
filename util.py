@@ -87,7 +87,7 @@ async def send_to_telegram(message):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
-                # await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
@@ -145,8 +145,8 @@ def clear_exchange_price_orderbook(exchange, exchange_price_orderbook):
 def is_need_reset_socket(start_time):
     #매일 오전 9시인지 확인해 9시가 넘었다면 True를 반환 (Websocket 재연결목적)
     now = datetime.now()
-    start_date_base_time = start_time.replace(hour=9, minute=0, second=0,microsecond=0)
-    next_base_time = (start_time + timedelta(days=1)).replace(hour=9,minute=0, second=0, microsecond=0)
+    start_date_base_time = start_time.replace(hour=9, minute=0, second=0, microsecond=0)
+    next_base_time = (start_time + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
     if start_time < start_date_base_time:
         if start_date_base_time < now:
             return True
@@ -175,26 +175,32 @@ def load_remain_position(position_data, trade_data):
                 data = split_data[2]
                 if type == 'POSITION':
                     position_data[ticker] = json.loads(data)
-                    print(f"{ticker}|FILE_LOAD|{position_data[ticker] }")
+                    logging.info(f"{ticker}|FILE_LOAD|{position_data[ticker] }")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
-                    print(f"{ticker}|FILE_LOAD|{trade_data[ticker]}")
+                    logging.info(f"{ticker}|FILE_LOAD|{trade_data[ticker]}")
             except:
                 continue
     else:
         print(f"{get_position_path} 파일이 존재하지 않습니다.")
 
-def put_remain_position(ticker, position_data, trade_data):
+def put_remain_position(position_data, trade_data):
+    put_position_path = ''
+    put_data = ''
+
     if ENV == 'real':
         put_position_path = '/root/arbitrage/conf/position_data_' + today
     elif ENV == 'local':
         put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data_' + today
 
-    put_data = ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
-    put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
+    for ticker in position_data:
+        if position_data[ticker]['position'] == 1:
+            put_data = ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
+            put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
 
-    with open(put_position_path, 'a') as file:
+    with open(put_position_path, 'w') as file:
         file.write(put_data)
+
 
 def load_history_data():
     if ENV == 'real':

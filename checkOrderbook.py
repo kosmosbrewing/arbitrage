@@ -54,3 +54,5 @@ def check_orderbook(orderbook_info, orderbook_check):
                  "balance_bid_average": balance_bid_average, "balance_ask_average": balance_ask_average}
 
 
+if __name__ == "__main__":
+    check_orderbook({},{})
