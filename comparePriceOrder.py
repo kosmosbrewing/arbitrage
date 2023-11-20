@@ -4,7 +4,7 @@ from collections import deque
 from consts import *
 
 async def compare_price_order(orderbook_check, remain_bid_balance, check_data, trade_data,
-                                               position_data, accum_ticker_count, accum_ticker_data):
+                                position_data, accum_ticker_count, accum_ticker_data, position_ticker_count):
     """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     base_exchange = UPBIT
     compare_exchange = BINANCE
@@ -14,11 +14,6 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
     for ticker in orderbook_check:
         if ticker in ["USD"]:  # 스테이블코인은 비교 제외
             continue
-
-        # 해당 코인이 상장되어 있는 거래소 목록
-
-        #print(f"{UPBIT} {ticker}", orderbook_check[ticker][base_exchange])
-        #print(f"{BINANCE} {ticker}", orderbook_check[ticker][compare_exchange])
 
         # 가격 정보가 없으면 pass
         if orderbook_check[ticker][base_exchange] is None or orderbook_check[ticker][compare_exchange] is None:
@@ -45,18 +40,14 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
 
         # 거래소간의 가격차이(%)
         if open_bid > open_ask:
-            open_gimp = round(
-                (open_bid - open_ask) / open_ask * 100, 2)
+            open_gimp = round((open_bid - open_ask) / open_ask * 100, 2)
         elif open_ask > open_bid:
-            open_gimp = round(
-                (open_ask - open_bid) / open_bid * 100, 2) * -1
+            open_gimp = round((open_ask - open_bid) / open_bid * 100, 2) * -1
 
         if close_bid > close_ask:
-            close_gimp = round(
-                (close_bid - close_ask) / close_ask * 100, 2)
+            close_gimp = round((close_bid - close_ask) / close_ask * 100, 2)
         elif close_ask > close_bid:
-            close_gimp = round(
-                (close_ask - close_bid) / close_bid * 100, 2) * -1
+            close_gimp = round((close_ask - close_bid) / close_bid * 100, 2) * -1
 
         if open_bid_btc > open_ask_btc:
             btc_open_gimp = round((open_bid_btc - open_ask_btc) / open_ask_btc * 100, 2)
@@ -71,27 +62,12 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
             check_data[ticker] = {"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                   "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask}
         if ticker not in position_data:
-            # open_install_count =  분할매수 횟수,
-            # position =  현재 진입해있는지 (포지션 잡았는지) 업비트롱, 바이낸스숏
-            # position_gimp = 현재 포지션 진입해있는 김프 값
-            # open_install_count =  분할매수 횟수
-            # close_count = 손절로직 동작 체크 횟수
             position_data[ticker] = {"open_install_count": 0, "close_install_count": 0, "position": 0,
-                                     "position_gimp": 0,
-                                     "position_gimp_accum": 0, "close_count": 0, "accum_open_install_count": 0}
+                                     "position_gimp": 0, "position_gimp_accum": 0, "accum_open_install_count": 0}
         if ticker not in trade_data:
-            # open_bid_price =  포지션 진입 업비트 현물 매수 총 금액
-            # open_ask_price = 포지션 종료 업비트 현물 매도 총 금액
-            # close_bid_price = 포지션 종료 업비트 선물 매수 총 금액 (숏 종료)
-            # close_ask_price = 포지션 진입 업비트 선물 매도 총 금액 (숏 진입)
-            # open_quantity = 거래 수량
-            # trade_profit = 거래 손익
-            # profit_count = 손익 횟수
-            # total_profit = 총 손익
             trade_data[ticker] = {"open_bid_price": 0, "open_ask_price": 0, "close_bid_price": 0,
-                                  "close_ask_price": 0,
-                                  "open_quantity": 0, "close_quantity": 0, "total_quantity": 0,
-                                  "trade_profit": 0, "profit_count": 0, "total_profit": 0}
+                                  "close_ask_price": 0, "open_quantity": 0, "close_quantity": 0,
+                                  "total_quantity": 0, "trade_profit": 0, "profit_count": 0, "total_profit": 0}
 
         if ticker not in accum_ticker_count:
             queue = deque(maxlen=FRONT_OPEN_COUNT)
@@ -106,9 +82,13 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
         average_open_gimp = sum(accum_ticker_data[ticker]) / len(accum_ticker_data[ticker])
 
         logging.info(f"ORDER|{ticker}|GIMP|{open_gimp}/{close_gimp}|LOW_GIMP|{check_data[ticker]['open_gimp']}"
-                     f"|BTC_GIMP|{btc_open_gimp}"
-                     f"|AVG_GIMP|{average_open_gimp}|COUNT|{sum(accum_ticker_count[ticker])}"
-                     f"|OPEN|{open_bid}/{open_ask}|CLOSE|{close_bid}/{close_ask}")
+                     f"|BTC_GIMP|{btc_open_gimp}|AVG_GIMP|{average_open_gimp}|COUNT|{sum(accum_ticker_count[ticker])}"
+                     f"|OPEN|{open_bid}/{open_ask}|CLOSE|{close_bid}/{close_ask}"
+                     f"|POSITION_CNT|{position_ticker_count['count']}")
+
+        if remain_bid_balance['balance'] < 0:
+            accum_ticker_count[ticker].append(0)
+            continue
 
         ## 현재 김프가 저점일 때
         if open_gimp < check_data[ticker]['open_gimp']:
@@ -122,13 +102,20 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                 accum_ticker_count[ticker].append(0)
                 continue
 
+            if position_ticker_count['count'] >= POSITION_TICKER_COUNT:
+                accum_ticker_count[ticker].append(0)
+                continue
+
             if open_install_count == 0 and sum(accum_ticker_count[ticker]) <= OPEN_GIMP_COUNT:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             if open_install_count > 0 and position_data[ticker]['position_gimp'] * INSTALL_WEIGHT < open_gimp:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             if open_gimp > average_open_gimp and open_gimp > btc_open_gimp * BTC_GAP:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             # 매수/매도(숏) 기준 가격 잡기 (개수 계산)
@@ -137,9 +124,10 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
             open_bid_price = open_bid * open_quantity + trade_data[ticker]['open_bid_price']  ## 누적 매수 금액
             open_ask_price = open_ask * open_quantity + trade_data[ticker]['open_ask_price']  ## 누적 매도 금액
 
-            remain_bid_balance['balance'] -= open_bid * open_quantity
-
-            if remain_bid_balance['balance'] < 0:
+            if remain_bid_balance['balance'] - open_bid * open_quantity > 0:
+                remain_bid_balance['balance'] -= open_bid * open_quantity
+            else:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             update_open_position_data(ticker, position_data, open_gimp)
@@ -163,6 +151,7 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
             if position_data[ticker]['open_install_count'] > 1:
                 trade_data[ticker].update({"total_quantity": total_quantity})
             else:
+                position_ticker_count['count'] += 1
                 trade_data[ticker].update({"total_quantity": open_quantity})
 
             message = (f"POSITION_OPEN|{ticker}|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
@@ -202,11 +191,10 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
                     install_close_bid_price = close_bid * close_quantity
                     install_close_ask_price = close_ask * close_quantity
 
-                    trade_data[ticker]['close_bid_price'] += trade_data[ticker]['open_bid_price'] - \
-                                                             trade_data[ticker]['close_bid_price']
-                    trade_data[ticker]['close_ask_price'] += trade_data[ticker]['open_ask_price'] - \
-                                                             trade_data[ticker]['close_bid_price']
+                    trade_data[ticker]['close_bid_price'] += trade_data[ticker]['open_bid_price'] - trade_data[ticker]['close_bid_price']
+                    trade_data[ticker]['close_ask_price'] += trade_data[ticker]['open_ask_price'] - trade_data[ticker]['close_bid_price']
                     trade_data[ticker]['close_quantity'] += close_quantity
+                    position_ticker_count['count'] -= 1
                 ## 익절 분할 횟수 Count 도달하지 않을 시
                 else:
                     close_quantity = total_quantity * CLOSE_INSTALLMENT
@@ -261,7 +249,6 @@ async def compare_price_order(orderbook_check, remain_bid_balance, check_data, t
 
                     update_open_check_data(ticker, check_data, open_gimp, open_bid, open_ask)
                     update_close_check_data(ticker, check_data, close_gimp, close_bid, close_ask)
-
 
     for message in open_message_list:
         logging.info(message)
