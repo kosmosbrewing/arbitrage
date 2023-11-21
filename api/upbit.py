@@ -1,5 +1,6 @@
 import traceback
 import pyupbit
+from api import binance
 from consts import *
 import util
 import asyncio
@@ -25,28 +26,23 @@ def get_all_ticker():
     btc_ticker = pyupbit.get_tickers(fiat="BTC")
     only_in_btc = [ticker for ticker in btc_ticker if "KRW-" + ticker.split("-")[1] not in krw_ticker]
 
-    return krw_ticker + only_in_btc
+    return krw_ticker
+    #return krw_ticker + only_in_btc
 
-def get_usd_price(exchange_price):
+def get_usd_price(exchange_data):
     """UPBIT 달러정보 조회"""
     data = requests.get('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD').json()
-    exchange_price["USD"] = {'base': data[0]['basePrice']}
-    logging.info('환율정보 조회 : [{}]'.format(exchange_price["USD"]))
+    exchange_data["USD"] = {'base': data[0]['basePrice']}
+    logging.info('환율정보 조회 : [{}]'.format(exchange_data["USD"]))
 
 def check_order(recv_uuid):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
-    params = {
-        'uuid': '00000000-0000-0000-0000-000000000000'
-    }
-    print(params)
 
     params = {
         'uuid': recv_uuid
     }
-    print(params)
-
     query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
     m = hashlib.sha512()
     m.update(query_string)
@@ -68,27 +64,26 @@ def check_order(recv_uuid):
     res = requests.get(server_url + '/v1/order', params=params, headers=headers)
     data = res.json()
 
-    print(res.json())
+    logging.info(f"UPBIT_ORDER_RES|{data['executed_volume']}")
     return data['executed_volume']
 
 def spot_order(ticker, side, price, volume):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
-    market = 'KRW-' + ticker
 
     params = {
-        'market': market,
+        'market': ticker,
         'side': side
     }
     if side == 'bid':
         params['price'] = price
         params['ord_type'] = 'price'
-        print(f"UPBIT_ORDER|{ticker}|SIDE|{side}|PRICE|{price}")
+        logging.info(f"UPBIT_ORDER|{ticker}|SIDE|{side}|PRICE|{price}")
     elif side == 'ask':
         params['ord_type'] = 'market'
         params['volume'] = volume
-        print(f"UPBIT_ORDER|{ticker}|SIDE|{side}|QUANTITY|{volume}")
+        logging.info(f"UPBIT_ORDER|{ticker}|SIDE|{side}|QUANTITY|{volume}")
 
     query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
     m = hashlib.sha512()
@@ -107,18 +102,13 @@ def spot_order(ticker, side, price, volume):
     headers = {
         'Authorization': authorization,
     }
-    #res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
-    #data = res.json()
-    #print(res.json())
-
-    json_str = '{"uuid": "dcc337eb-1453-4f03-b83d-fe5f50748b6d"}'
-    data = json.loads(json_str)
-
-    quantity = check_order(data['uuid'])
+    res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
+    data = res.json()
+    logging.info(f"UPBIT_SPOT_ORDER|{data['uuid']}")
+    quantity = float(check_order(data['uuid']))
     return quantity
 
-
-async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_connect):
+async def connect_socket_spot_orderbook(exchange_data, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
@@ -158,8 +148,8 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
                             logging.info(f"{exchange} [Data error] : {data}")
                             continue
 
-                        if "BTC" in exchange_price:
-                            btc_price = float(exchange_price['BTC'][exchange])
+                        if "BTC" in exchange_data:
+                            btc_price = float(exchange_data['BTC'][exchange])
                         else:
                             btc_price = 0
 
@@ -185,8 +175,6 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
                         else:
                             for i in range(0, orderbook_len):
                                 if base_ticker == "BTC":
-                                    #data['orderbook_units'][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
-                                    #data['orderbook_units'][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
                                     orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = data['orderbook_units'][i]['ask_price'] * btc_price
                                     orderbook_info[ticker][exchange]["orderbook_units"][i]['bid_price'] = data['orderbook_units'][i]['bid_price'] * btc_price
                                 else:
@@ -213,7 +201,7 @@ async def connect_socket_spot_orderbook(exchange_price, orderbook_info, socket_c
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
 
-async def connect_socket_spot_ticker(exchange_price):
+async def connect_socket_spot_ticker(exchange_data):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
 
@@ -222,7 +210,7 @@ async def connect_socket_spot_ticker(exchange_price):
         try:
             #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_data)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Spot)")
             async with websockets.connect('wss://api.upbit.com/websocket/v1',
@@ -252,8 +240,8 @@ async def connect_socket_spot_ticker(exchange_price):
                             logging.info(f"{exchange} [Data error] : {data}")
                             continue
 
-                        if "BTC" in exchange_price:
-                            btc_price = float(exchange_price['BTC'][exchange])
+                        if "BTC" in exchange_data:
+                            btc_price = float(exchange_data['BTC'][exchange])
                         else:
                             btc_price = 0
 
@@ -263,14 +251,14 @@ async def connect_socket_spot_ticker(exchange_price):
                         if base_ticker == "BTC":
                             continue
 
-                        if ticker not in exchange_price:
-                            exchange_price[ticker] = {}
+                        if ticker not in exchange_data:
+                            exchange_data[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
-                                exchange_price[ticker].update({exchange_list: None})
+                                exchange_data[ticker].update({exchange_list: None})
                         if base_ticker == "BTC":  # 기준통화가 BTC인 경우는 "현재 가격 x BTC가격 "이 원화환산 가격
-                            exchange_price[ticker][exchange] = float(data['trade_price']) * btc_price
+                            exchange_data[ticker][exchange] = float(data['trade_price']) * btc_price
                         else:  # 기준통화가 원화인 경우, 현재가격(trade_price) 그대로 저장
-                            exchange_price[ticker][exchange] = float(data['trade_price'])
+                            exchange_data[ticker][exchange] = float(data['trade_price'])
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             logging.info('[{}] Time to new connection...'.format(exchange))
@@ -298,4 +286,9 @@ async def connect_socket_spot_ticker(exchange_price):
 
 
 if __name__ == "__main__":
-    spot_order('XRP', 'bid', '5000', '10')
+    print(round(0.341064120,1))
+    #get_all_ticker()
+    #open_quantity = spot_order('KRW-AVAX', 'bid', '10000', '10')
+    #open_quantity = float(1.34317089)
+    #print(float(round(open_quantity, 0)))
+    #binance.futures_order('AVAXUSDT', 'ask', float(round(open_quantity, 0)))

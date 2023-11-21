@@ -3,6 +3,8 @@ import traceback
 import logging
 from consts import *
 
+
+@profile
 def check_orderbook(orderbook_info, orderbook_check):
     # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
     for ticker in orderbook_info:
@@ -52,7 +54,3 @@ def check_orderbook(orderbook_info, orderbook_check):
                 {"bid_amount": bid_amount, "bid_average": bid_average,
                  "ask_amount": ask_amount, "ask_average": ask_average,
                  "balance_bid_average": balance_bid_average, "balance_ask_average": balance_ask_average}
-
-
-if __name__ == "__main__":
-    check_orderbook({},{})

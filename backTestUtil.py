@@ -45,7 +45,7 @@ def load_history_data():
         history_file_path = '/root/arbitrage/log/premium_data_' + yesterday
 
     elif ENV == 'local':
-        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_' + yesterday
+        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_all'
 
     if os.path.exists(history_file_path):
         print(history_file_path)

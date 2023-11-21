@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import datetime
 import math
 import util
+import numpy as np
 from consts import *
 
 def load_history_data():
@@ -121,4 +122,12 @@ def get_measure_ticker():
     return measure_ticker
 
 if __name__ == "__main__":
+    a = np.array(1)
+    b = np.array(4)
+
+
+    result_multiply = np.multiply(a, b)  # 요소별 곱셈
+    result_divide = np.divide(a, b)  # 요소별 나눗셈
+
+    print(result_multiply, result_divide)
     get_measure_ticker()

@@ -4,18 +4,12 @@ import traceback
 import logging
 from consts import *
 
-def compare_price(exchange_price, orderbook_check):
-    """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
-    base_message = "🔥프리미엄 정보\n"
-    message_dict = {}  # 갭 발생시 알람을 보낼 메시지를 저장해둘 딕셔너리
-    message_list = [""]  # message_dict에 저장했던 메시지들을 보낼 순서대로 저장한 리스트
 
+def compare_price(exchange_data, orderbook_check):
+    """ self.exchange_data 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     for ticker in orderbook_check:
         if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
             continue
-
-        # 해당 코인이 상장되어 있는 거래소 목록
-        # exchange_list = list(orderbook_check[ticker])
 
         base_exchange = UPBIT
         compare_exchange = BINANCE
@@ -74,26 +68,8 @@ def compare_price(exchange_price, orderbook_check):
             message += "AMOUNT|{}/{}|".format(
                 f"{orderbook_check[ticker][base_exchange]['ask_amount']:,.0f}",
                 f"{orderbook_check[ticker][compare_exchange]['bid_amount']:,.0f}")
-            message += "DOLLAR|{}".format(exchange_price["USD"]['base'])
+            message += "DOLLAR|{}".format(exchange_data["USD"]['base'])
         except:
             message += "호가미수신"
 
         logging.info(f"{message}")
-        message_dict[open_diff] = message  # 발생갭을 키값으로 message 저장
-
-    # 갭 순서로 메시지 정렬
-    message_dict = dict(sorted(message_dict.items(), reverse=True))  # 메시지 갭발생순으로 정렬
-
-    # 메세지 로깅 및 텔레그램 사이즈에 맞게 전처리
-    for i in message_dict:
-        # logging.info(f"Premium|{message_dict[i]}")
-        if len(message_list[len(message_list) - 1]) + len(message_dict[i]) < TELEGRAM_MESSAGE_MAX_SIZE:
-            message_list[len(message_list) - 1] += message_dict[i] + "\n"
-        else:
-            message_list.append(message_dict[i] + "\n")
-    message_list[0] = base_message + message_list[0]  # 알림 첫줄 구분용 문구추가
-
-    # 정렬한 메시지를 순서대로 텔레그램 알람전송
-    #for message in message_list:
-    #    await util.send_to_telegram(message)
-

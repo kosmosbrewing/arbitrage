@@ -2,7 +2,6 @@ import util
 import backTestUtil
 from consts import *
 from collections import deque
-from api import upbit, binance
 
 def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum_ticker_data):
     if ticker not in position_data:
@@ -35,13 +34,14 @@ def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum
         queue = deque(maxlen=FRONT_AVERAGE_COUNT)
         accum_ticker_data[ticker] = queue
 
+
 def get_measure_ticker():
     check_data = {}
     trade_data = {}
     position_data = {}
-    measure_ticker = {}
     accum_ticker_count = {}
     accum_ticker_data = {}
+    position_ticker_count = 0
 
     #util.load_remain_position(position_data, trade_data)
 
@@ -64,13 +64,9 @@ def get_measure_ticker():
             btc_open_gimp = float(split_data[11])
         except:
             continue
-        #print(btc_open_gimp)
-        total_quantity = 0
-
-        #if ticker != 'SOL':
-        #    continue
 
         curr_gimp_gap = open_gimp - close_gimp if open_gimp > close_gimp else 0
+
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -83,13 +79,8 @@ def get_measure_ticker():
         accum_ticker_data[ticker].append(close_gimp)
         average_open_gimp = sum(accum_ticker_data[ticker]) / len(accum_ticker_data[ticker])
 
-        ## 진입/종료 갭차이 너무 많이 들어가면 들어가지 않음
-        if curr_gimp_gap > CURR_GIMP_GAP:
-            #print(f"{date_time}{ticker} | 갭차이 너무난다야")
-            accum_ticker_count[ticker].append(0)
-            continue
-
         if remain_bid_balance < 0:
+            accum_ticker_count[ticker].append(0)
             continue
 
         ## 현재 김프가 저점일 때
@@ -97,16 +88,27 @@ def get_measure_ticker():
             # open_gimp 이 Update 되면 close_gimp은 그 시점으로 gap 수정
             update_open_check_data(ticker, check_data, open_gimp, open_bid, open_ask)
             update_close_check_data(ticker, check_data, close_gimp, close_bid, close_ask)
-
             open_install_count = position_data[ticker]['open_install_count']
 
+            ## 진입/종료 갭차이 너무 많이 들어가면 들어가지 않음
+            if curr_gimp_gap > CURR_GIMP_GAP:
+                accum_ticker_count[ticker].append(0)
+                continue
+
+            if position_ticker_count >= POSITION_TICKER_COUNT:
+                accum_ticker_count[ticker].append(0)
+                continue
+
             if open_install_count == 0 and sum(accum_ticker_count[ticker]) <= OPEN_GIMP_COUNT:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             if open_install_count > 0 and position_data[ticker]['position_gimp'] * INSTALL_WEIGHT < open_gimp:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             if open_gimp > average_open_gimp and open_gimp > btc_open_gimp * BTC_GAP:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             # 매수/매도(숏) 기준 가격 잡기 (개수 계산)
@@ -119,6 +121,7 @@ def get_measure_ticker():
             if remain_bid_balance - open_bid * open_quantity > 0:
                 remain_bid_balance -= open_bid * open_quantity
             else:
+                accum_ticker_count[ticker].append(0)
                 continue
 
             update_open_position_data(ticker, position_data, open_gimp)
@@ -138,9 +141,11 @@ def get_measure_ticker():
 
             trade_data[ticker].update({"open_quantity": open_quantity})
             total_quantity = open_quantity + trade_data[ticker]['total_quantity']
+
             if position_data[ticker]['open_install_count'] > 1:
                 trade_data[ticker].update({"total_quantity": total_quantity})
             else:
+                position_ticker_count += 1
                 trade_data[ticker].update({"total_quantity": open_quantity})
 
             ### 주문 로직
@@ -153,11 +158,6 @@ def get_measure_ticker():
 
         ## 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
         if close_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
-            '''
-            print(f"{date_time}{ticker}|갭포착|L_OPEN_GIMP|{check_data[ticker]['open_gimp']}|C_CLOSE_GIMP|{close_gimp}"
-                  f"|C_OPEN_GIMP|{open_gimp}|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}"
-                  f"|BTC_OPEN_GIMP{round(btc_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}")
-            '''
             update_open_check_data(ticker, check_data, open_gimp, open_bid, open_ask)
             update_close_check_data(ticker, check_data, close_gimp, close_bid, close_ask)
             accum_ticker_count[ticker].append(1)
@@ -185,6 +185,7 @@ def get_measure_ticker():
                     trade_data[ticker]['close_bid_price'] += trade_data[ticker]['open_bid_price'] - trade_data[ticker]['close_bid_price']
                     trade_data[ticker]['close_ask_price'] += trade_data[ticker]['open_ask_price'] - trade_data[ticker]['close_bid_price']
                     trade_data[ticker]['close_quantity'] += close_quantity
+                    position_ticker_count -= 1
                 ## 익절 분할 횟수 Count 도달하지 않을 시
                 else:
                     close_quantity = total_quantity * CLOSE_INSTALLMENT
@@ -240,19 +241,14 @@ def get_measure_ticker():
                     update_open_check_data(ticker, check_data, open_gimp, open_bid, open_ask)
                     update_close_check_data(ticker, check_data, close_gimp, close_bid, close_ask)
 
-                measure_ticker[ticker] = {"units": []}
-
-    for ticker in measure_ticker:
-        print(f"{date_time}{ticker}|손익|OPEN_COUNT|{position_data[ticker]['accum_open_install_count']}"
+    for ticker in trade_data:
+        if trade_data[ticker]['profit_count'] >= 1:
+            print(f"{date_time}{ticker}|손익|OPEN_COUNT|{position_data[ticker]['accum_open_install_count']}"
               f"|PROFIT_COUNT|{trade_data[ticker]['profit_count']}"
               f"|T_PROFIT|{trade_data[ticker]['total_profit']}")
 
     for ticker in position_data:
         if position_data[ticker]['position'] == 1:
-            #trade_data[ticker]['total_quantity'] = trade_data[ticker]['total_quantity'] - trade_data[ticker]['close_quantity']
-            #trade_data[ticker]['close_quantity'] = 0
-            #trade_data[ticker]['open_bid_price'] = trade_data[ticker]['open_bid_price'] - trade_data[ticker]['close_bid_price']
-
             print(f"{date_time}{ticker}|포지션유지|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
                   f"|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
                   f"|INSATLL|{position_data[ticker]['open_install_count']}"

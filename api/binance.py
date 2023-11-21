@@ -23,16 +23,30 @@ def get_all_ticker():
 
 def get_all_book_ticker():
     """데이터 수신할 SYMBOL 목록"""
-    res = requests.get("https://api.binance.com/api/v3/exchangeInfo")
+    res = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
     res = res.json()
+
     return [s['symbol'].lower() + "@depth" for s in res['symbols'] if "USDT" in s['symbol']]
+
+def get_quantity_precision(exchange_data):
+    """데이터 수신할 SYMBOL 목록"""
+    res = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
+    res = res.json()
+
+    for s in res['symbols']:
+        if "USDT" in s['symbol']:
+            ticker = s['symbol'].replace("USDT", "")
+            exchange_data[ticker] = {'quantity_precision': s['quantityPrecision']}
+
+    logging.info(f"Binance Quantity Precision 요청 : {exchange_data}")
+    #print([s['symbol'].lower() + "|" + str(s['quantityPrecision']) for s in res['symbols'] if "USDT" in s['symbol']])
 
 def futures_order(ticker, side, quantity):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
     server_url = 'https://fapi.binance.com/fapi/v1/order'
     timestamp = int(time.time() * 1000)
-    market = ticker+'USDT'
+
     if side == 'ask':
         side = 'BUY'
     else:
@@ -40,7 +54,7 @@ def futures_order(ticker, side, quantity):
 
     # 주문 정보 (예시 값)
     payload = {
-        'symbol': market,  # 거래 코인
+        'symbol': ticker,  # 거래 코인
         'side': side,  # 매수 또는 매도
         'type': 'MARKET',  # 주문 유형 (시장가, 지정가 등)
         'quantity': quantity,  # 주문 수량
@@ -58,14 +72,52 @@ def futures_order(ticker, side, quantity):
     signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
                          digestmod=hashlib.sha256).hexdigest()
 
-    print(f"BINANCE_ORDER|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
+    logging.info(f"BINANCE_ORDER|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
     # 서명을 요청 파라미터에 추가
     server_url = f'{server_url}?{query_string}&signature={signature}'
-    #print(server_url)
-    #res = requests.post(server_url, headers=headers)
-    #print(res.text)
+    res = requests.post(server_url, headers=headers)
+    print(res.text)
+    logging.info(f"BINANCE_ORDER_RES{res.json()}")
 
-async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socket_connect):
+def futures_order_all(ticker, side):
+    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
+    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
+    server_url = 'https://fapi.binance.com/fapi/v1/order'
+    timestamp = int(time.time() * 1000)
+
+    if side == 'ask':
+        side = 'BUY'
+    else:
+        side = 'SELL'
+
+    # 주문 정보 (예시 값)
+    payload = {
+        'symbol': ticker,  # 거래 코인
+        'side': side,  # 매수 또는 매도
+        'type': 'MARKET',  # 주문 유형 (시장가, 지정가 등)
+        'closePosition': True,  # 주문 수량
+        'timestamp': timestamp
+    }
+    # 파라미터를 쿼리스트링 형태로 변환
+    query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
+
+    # 헤더 설정
+    headers = {
+        'X-MBX-APIKEY': access_key
+    }
+
+    # 서명 생성
+    signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
+                         digestmod=hashlib.sha256).hexdigest()
+
+    logging.info(f"BINANCE_ORDER|{ticker}|SIDE|{side}|QUANTITY|ALL")
+    # 서명을 요청 파라미터에 추가
+    server_url = f'{server_url}?{query_string}&signature={signature}'
+    res = requests.post(server_url, headers=headers)
+    print(res.text)
+    logging.info(f"BINANCE_ORDER_RES{res.json()}")
+
+async def connect_socket_futures_orderbook(exchange_data, orderbook_info, socket_connect):
     """Binance 소켓연결"""
     exchange = BINANCE
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
@@ -111,8 +163,8 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socke
                         if not ticker:  # ticker가 없는 데이터의 경우 저장 불가
                             continue
 
-                        if 'USD' in exchange_price:
-                            usd_price = exchange_price['USD']['base']
+                        if 'USD' in exchange_data:
+                            usd_price = exchange_data['USD']['base']
                         else:
                             usd_price = 0
 
@@ -170,7 +222,7 @@ async def connect_socket_futures_orderbook(exchange_price, orderbook_info, socke
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
 
-async def connect_socket_spot_ticker(exchange_price):
+async def connect_socket_spot_ticker(exchange_data):
     """Binance 소켓연결"""
     exchange = BINANCE
 
@@ -179,7 +231,7 @@ async def connect_socket_spot_ticker(exchange_price):
         try:
             #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_data)
 
             logging.info(f"{exchange} WebSocket 연결 합니다.")
             async with websockets.connect('wss://stream.binance.com:9443/ws', ping_interval=SOCKET_PING_INTERVAL,
@@ -214,11 +266,11 @@ async def connect_socket_spot_ticker(exchange_price):
                         ticker = data['s'].replace("USDT", "") if 's' in data else None
                         if not ticker:  # ticker가 없는 데이터의 경우 저장 불가
                             continue
-                        if ticker not in exchange_price:
-                            exchange_price[ticker] = {exchange: None}
+                        if ticker not in exchange_data:
+                            exchange_data[ticker] = {exchange: None}
 
-                        exchange_price[ticker][exchange] = float(data['c']) * \
-                                        exchange_price['USD']['base'] if 'USD' in exchange_price else 0
+                        exchange_data[ticker][exchange] = float(data['c']) * \
+                                        exchange_data['USD']['base'] if 'USD' in exchange_data else 0
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             #await util.send_to_telegram('[{}] Time to new connection...'.format(exchange))
@@ -244,7 +296,7 @@ async def connect_socket_spot_ticker(exchange_price):
             continue
 
 
-async def connect_socket_futures_ticker(exchange_price):
+async def connect_socket_futures_ticker(exchange_data):
     """Binance 소켓연결"""
     exchange = BINANCE
     logging.info(f"{exchange} connect_socket")
@@ -252,7 +304,7 @@ async def connect_socket_futures_ticker(exchange_price):
         try:
             #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
-            util.clear_exchange_price(exchange, exchange_price)
+            util.clear_exchange_data(exchange, exchange_data)
 
             logging.info(f"{exchange} WebSocket 연결 합니다. (Spot)")
             async with websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
@@ -288,17 +340,17 @@ async def connect_socket_futures_ticker(exchange_price):
 
                         if not ticker:  # ticker가 없는 데이터의 경우 저장 불가
                             continue
-                        if ticker not in exchange_price:
-                            exchange_price[ticker] = {}
+                        if ticker not in exchange_data:
+                            exchange_data[ticker] = {}
                             for exchange_list in EXCHANGE_LIST:
-                                exchange_price[ticker].update({exchange_list: None})
+                                exchange_data[ticker].update({exchange_list: None})
 
-                        if 'USD' in exchange_price:
-                            usd_price = exchange_price['USD']['base']
+                        if 'USD' in exchange_data:
+                            usd_price = exchange_data['USD']['base']
                         else:
                             usd_price = 0
 
-                        exchange_price[ticker][exchange] = float(data['c']) * usd_price
+                        exchange_data[ticker][exchange] = float(data['c']) * usd_price
 
                         if util.is_need_reset_socket(start_time):  # 매일 아침 9시 소켓 재연결
                             logging.info('[{}] Time to new connection...'.format(exchange))
@@ -323,7 +375,47 @@ async def connect_socket_futures_ticker(exchange_price):
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
+def change_leverage_all_ticker():
+    # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
+    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
+    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
+    server_url = 'https://fapi.binance.com/fapi/v1/leverage'
 
+    # 변경할 레버리지
+    new_leverage = 1
+
+    # 요청 헤더
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-MBX-APIKEY': access_key
+    }
+    # 모든 티커 가져오기
+    exchange_info_url = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
+    exchange_info_response = requests.get(exchange_info_url)
+    symbols = exchange_info_response.json()['symbols']
+    # 각 티커에 대해 레버리지 설정 변경
+    for symbol_info in symbols:
+        symbol = symbol_info['symbol']
+        timestamp = int(time.time() * 1000)
+        # 요청 매개변수
+        params = {
+            'symbol': symbol,
+            'leverage': new_leverage,
+            'timestamp': timestamp
+        }
+        # 시그니처 생성
+        query_string = '&'.join([f'{key}={params[key]}' for key in params])
+        signature = hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+        # API 요청 보내기
+        response = requests.post(server_url, params={**params, 'signature': signature}, headers=headers)
+        data = response.json()
+        # 응답 출력
+        print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
+        time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
 
 if __name__ == "__main__":
-    futures_order('ORDI', 'ask', '10000', '2')
+    change_leverage_all_ticker()
+
+    #exchange_data = {}
+    #get_quantity_precision(exchange_data)
+    #futures_order('ORDI', 'ask', '10000', '2')
