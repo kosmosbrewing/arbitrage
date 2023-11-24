@@ -20,7 +20,7 @@ today = now_date.strftime("%Y%m%d")
 yesterday = now_date - datetime.timedelta(days=1)
 yesterday = yesterday.strftime("%Y%m%d")
 
-def setup_logging():
+def setup_collect_logging():
     logging.basicConfig(level=logging.INFO)
     # TimedRotatingFileHandler를 설정하여 날짜별로 로그 파일을 회전
     if ENV == 'real':
@@ -45,6 +45,33 @@ def setup_logging():
     # 루트 로거에 핸들러 추가
     root_logger = logging.getLogger()
     root_logger.addHandler(file_handler)
+
+def setup_order_logging():
+    logging.basicConfig(level=logging.INFO)
+    # TimedRotatingFileHandler를 설정하여 날짜별로 로그 파일을 회전
+    if ENV == 'real':
+        log_file_path = '/root/arbitrage/log/order.log'
+    elif ENV == 'local':
+        log_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/order.log'
+
+    # 파일 핸들러 생성 및 설정
+
+    file_handler = TimedRotatingFileHandler(filename=log_file_path, when='midnight', interval=1, backupCount=30)
+    file_handler.suffix = "%Y%m%d"
+    file_handler.setLevel(logging.INFO)
+
+    # 로그 포매터 설정
+    if ENV == 'real':
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s]:%(message)s')
+    elif ENV == 'local':
+        formatter = logging.Formatter('[%(asctime)s][%(levelname)s]:%(message)s ...(%(filename)s:%(lineno)d)')
+
+    file_handler.setFormatter(formatter)
+
+    # 루트 로거에 핸들러 추가
+    root_logger = logging.getLogger()
+    root_logger.addHandler(file_handler)
+
 
 async def get_chat_id():
     logging.info("Telegram Chat ID 요청합니다..")
@@ -159,9 +186,9 @@ def is_need_reset_socket(start_time):
 
 def load_remain_position(position_data, trade_data):
     if ENV == 'real':
-        get_position_path = '/root/arbitrage/conf/position_data_' + yesterday
+        get_position_path = '/root/arbitrage/conf/position_data.DAT'
     elif ENV == 'local':
-        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data_' + yesterday
+        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
 
     if os.path.exists(get_position_path):
         with open(get_position_path, 'r', encoding='utf-8') as file:
@@ -175,32 +202,33 @@ def load_remain_position(position_data, trade_data):
                 data = split_data[2]
                 if type == 'POSITION':
                     position_data[ticker] = json.loads(data)
-                    logging.info(f"{ticker}|FILE_LOAD|{position_data[ticker] }")
+                    logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{position_data[ticker] }")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
-                    logging.info(f"{ticker}|FILE_LOAD|{trade_data[ticker]}")
+                    logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{trade_data[ticker]}")
             except:
                 continue
     else:
-        print(f"{get_position_path} 파일이 존재하지 않습니다.")
+        print("There is no file")
+        #logging.info(f"{get_position_path} There is no file")
 
 def put_remain_position(position_data, trade_data):
     put_position_path = ''
     put_data = ''
 
     if ENV == 'real':
-        put_position_path = '/root/arbitrage/conf/position_data_' + today
+        put_position_path = '/root/arbitrage/conf/position_data.DAT'
     elif ENV == 'local':
-        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data_' + today
+        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
 
     for ticker in position_data:
         if position_data[ticker]['position'] == 1:
-            put_data = ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
+            put_data += ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
             put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
+            #logging.info(f"{ticker}|POSITION_TRADE_FILE_PUT")
 
     with open(put_position_path, 'w') as file:
         file.write(put_data)
-
 
 def load_history_data():
     if ENV == 'real':

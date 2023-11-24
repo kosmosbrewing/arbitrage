@@ -64,10 +64,10 @@ def check_order(recv_uuid):
     res = requests.get(server_url + '/v1/order', params=params, headers=headers)
     data = res.json()
 
-    logging.info(f"UPBIT_ORDER_RES|{data['executed_volume']}")
+    logging.info(f"UPBIT_RESPONSE|QUANTITY|{data}")
     return data['executed_volume']
 
-def spot_order(ticker, side, price, volume):
+async def spot_order(ticker, side, price, volume, lock):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
@@ -79,11 +79,11 @@ def spot_order(ticker, side, price, volume):
     if side == 'bid':
         params['price'] = price
         params['ord_type'] = 'price'
-        logging.info(f"UPBIT_ORDER|{ticker}|SIDE|{side}|PRICE|{price}")
+        logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|PRICE|{price}")
     elif side == 'ask':
         params['ord_type'] = 'market'
         params['volume'] = volume
-        logging.info(f"UPBIT_ORDER|{ticker}|SIDE|{side}|QUANTITY|{volume}")
+        logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{volume}")
 
     query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
     m = hashlib.sha512()
@@ -102,23 +102,25 @@ def spot_order(ticker, side, price, volume):
     headers = {
         'Authorization': authorization,
     }
+    await lock.acquire()
     res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
     data = res.json()
-    logging.info(f"UPBIT_SPOT_ORDER|{data['uuid']}")
-    quantity = float(check_order(data['uuid']))
-    return quantity
+    logging.info(f"UPBIT_RESPONSE|{data}")
+    lock.release()
+    #logging.info(f"UPBIT_RESPONSE|UUID|{data['uuid']}")
+    #quantity = float(check_order(data['uuid']))
 
 async def connect_socket_spot_orderbook(exchange_data, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
+    btc_price = 0
     logging.info(f"{exchange} connect_socket_orderbook")
     while True:
         try:
             #await util.send_to_telegram('[{}] Creating new connection...'.format(exchange))
             start_time = datetime.now()
             #util.clear_orderbook_info(exchange, orderbook_info)
-
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
             async with (websockets.connect('wss://api.upbit.com/websocket/v1',
                                           ping_interval=None, ping_timeout=30, max_queue=10000) as websocket):
@@ -147,11 +149,11 @@ async def connect_socket_spot_orderbook(exchange_data, orderbook_info, socket_co
                         if 'code' not in data: # 응답 데이터(딕셔너리)에 code가 없는 경우 제외
                             logging.info(f"{exchange} [Data error] : {data}")
                             continue
-
+                        '''
                         if "BTC" in exchange_data:
                             btc_price = float(exchange_data['BTC'][exchange])
                         else:
-                            btc_price = 0
+                            btc_price = 0'''
 
                         base_ticker = data['code'].split('-')[0] # KRW-BTC > KRW(기준통화)
                         ticker = data['code'].split('-')[1]     # KRW-BTC > BTC(시세조회대코인)

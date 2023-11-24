@@ -41,7 +41,7 @@ def get_quantity_precision(exchange_data):
     logging.info(f"Binance Quantity Precision 요청 : {exchange_data}")
     #print([s['symbol'].lower() + "|" + str(s['quantityPrecision']) for s in res['symbols'] if "USDT" in s['symbol']])
 
-def futures_order(ticker, side, quantity):
+async def futures_order(ticker, side, quantity, lock):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
     server_url = 'https://fapi.binance.com/fapi/v1/order'
@@ -72,14 +72,15 @@ def futures_order(ticker, side, quantity):
     signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
                          digestmod=hashlib.sha256).hexdigest()
 
-    logging.info(f"BINANCE_ORDER|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
+    logging.info(f"BINANCE_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
     # 서명을 요청 파라미터에 추가
     server_url = f'{server_url}?{query_string}&signature={signature}'
-    res = requests.post(server_url, headers=headers)
-    print(res.text)
-    logging.info(f"BINANCE_ORDER_RES{res.json()}")
 
-def futures_order_all(ticker, side):
+    async with lock:
+        res = requests.post(server_url, headers=headers)
+        logging.info(f"BINANCE_RESPONSE|{res.json()}")
+
+async def futures_order_all(ticker, side):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
     server_url = 'https://fapi.binance.com/fapi/v1/order'
@@ -113,10 +114,9 @@ def futures_order_all(ticker, side):
     logging.info(f"BINANCE_ORDER|{ticker}|SIDE|{side}|QUANTITY|ALL")
     # 서명을 요청 파라미터에 추가
     server_url = f'{server_url}?{query_string}&signature={signature}'
-    res = requests.post(server_url, headers=headers)
-    print(res.text)
-    logging.info(f"BINANCE_ORDER_RES{res.json()}")
 
+    res = requests.post(server_url, headers=headers)
+    logging.info(f"BINANCE_RESPONSE|{res.json()}")
 async def connect_socket_futures_orderbook(exchange_data, orderbook_info, socket_connect):
     """Binance 소켓연결"""
     exchange = BINANCE
@@ -379,10 +379,10 @@ def change_leverage_all_ticker():
     # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
-    server_url = 'https://fapi.binance.com/fapi/v1/leverage'
+    server_url = 'https://fapi.binance.com/fapi/v1/marginType'
 
     # 변경할 레버리지
-    new_leverage = 1
+    new_leverage = 'ISOLATED'
 
     # 요청 헤더
     headers = {
@@ -400,7 +400,7 @@ def change_leverage_all_ticker():
         # 요청 매개변수
         params = {
             'symbol': symbol,
-            'leverage': new_leverage,
+            'marginType': new_leverage,
             'timestamp': timestamp
         }
         # 시그니처 생성
