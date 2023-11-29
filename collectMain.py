@@ -57,7 +57,8 @@ class Premium:
                 if sum(socket_connect) < 2:
                     print(f"Socket 연결 끊어 짐(정상 2) : {sum(socket_connect)}, compare_price PASS!")
                 elif sum(socket_connect) == 2:
-                    comparePrice.compare_price(exchagne_data, orderbook_check)
+                    comparePrice.compare_price(exchagne_data, orderbook_check, self.check_data,
+                                               self.accum_ticker_count, self.accum_ticker_data)
 
             except Exception as e:
                 logging.info(traceback.format_exc())

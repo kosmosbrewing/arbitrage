@@ -1,4 +1,6 @@
 import hashlib
+
+import aiohttp
 import ujson
 import requests
 from consts import *
@@ -41,16 +43,61 @@ def get_quantity_precision(exchange_data):
     logging.info(f"Binance Quantity Precision 요청 : {exchange_data}")
     #print([s['symbol'].lower() + "|" + str(s['quantityPrecision']) for s in res['symbols'] if "USDT" in s['symbol']])
 
-async def futures_order(ticker, side, quantity, lock):
+
+async def check_order(ticker, order_result, lock):
+    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
+    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
+    server_url = 'https://fapi.binance.com/fapi/v1/order'
+    timestamp = int(time.time() * 1000)
+
+    # 주문 정보 (예시 값)
+    payload = {
+        'symbol': ticker,  # 거래 코인
+        'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
+        'timestamp': timestamp
+    }
+    # 파라미터를 쿼리스트링 형태로 변환
+    query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
+    # 헤더 설정
+    headers = {
+        'X-MBX-APIKEY': access_key
+    }
+    # 서명 생성
+    signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
+                         digestmod=hashlib.sha256).hexdigest()
+    payload = {
+        'symbol': ticker,  # 거래 코인
+        'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
+        'timestamp': timestamp,
+        'signature': signature
+    }
+    # 서명을 요청 파라미터에 추가
+    # server_url = f'{server_url}?{query_string}&signature={signature}'
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(server_url, headers=headers, params=payload) as res:
+            data = await res.json()
+
+    try:
+        async with lock:
+            logging.info("BINANCE 주문 확인 결과")
+            logging.info(f"BINANCE_REQUEST|{ticker}|orderId|{order_result['orderId']}")
+            logging.info(f"BINANCE_RESPONSE|{data}")
+            order_result['binance_price'] = float(data['avgPrice'])
+            order_result['binance_quantity'] = float(data['executedQty'])
+    except:
+        logging.info("BINANCE 주문 확인 실패")
+
+async def futures_order(ticker, side, quantity, order_result, lock):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
     server_url = 'https://fapi.binance.com/fapi/v1/order'
     timestamp = int(time.time() * 1000)
 
     if side == 'ask':
-        side = 'BUY'
-    else:
         side = 'SELL'
+    elif side == 'bid':
+        side = 'BUY'
 
     # 주문 정보 (예시 값)
     payload = {
@@ -62,24 +109,30 @@ async def futures_order(ticker, side, quantity, lock):
     }
     # 파라미터를 쿼리스트링 형태로 변환
     query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
-
     # 헤더 설정
     headers = {
         'X-MBX-APIKEY': access_key
     }
-
     # 서명 생성
     signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
                          digestmod=hashlib.sha256).hexdigest()
-
-    logging.info(f"BINANCE_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
     # 서명을 요청 파라미터에 추가
     server_url = f'{server_url}?{query_string}&signature={signature}'
 
-    async with lock:
-        res = requests.post(server_url, headers=headers)
-        logging.info(f"BINANCE_RESPONSE|{res.json()}")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(server_url, headers=headers) as res:
+            data = await res.json()
 
+    #res = requests.post(server_url, headers=headers)
+    #data = res.json()
+    try:
+        async with lock:
+            logging.info("BINANCE 주문 결과")
+            logging.info(f"BINANCE_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
+            logging.info(f"BINANCE_RESPONSE|{data}")
+            order_result['orderId'] = data['orderId']
+    except:
+        logging.info("BINANCE 주문 실패")
 async def futures_order_all(ticker, side):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
@@ -414,7 +467,8 @@ def change_leverage_all_ticker():
         time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
 
 if __name__ == "__main__":
-    change_leverage_all_ticker()
+    check_order('EGLDUSDT', 5918332535)
+    #change_leverage_all_ticker()
 
     #exchange_data = {}
     #get_quantity_precision(exchange_data)

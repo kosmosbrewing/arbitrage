@@ -1,8 +1,11 @@
 import traceback
+
+import aiohttp
 import pyupbit
 from api import binance
 from consts import *
 import util
+import asyncio
 import asyncio
 import websockets
 import json
@@ -35,13 +38,13 @@ def get_usd_price(exchange_data):
     exchange_data["USD"] = {'base': data[0]['basePrice']}
     logging.info('환율정보 조회 : [{}]'.format(exchange_data["USD"]))
 
-def check_order(recv_uuid):
+async def check_order(order_result, lock):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
 
     params = {
-        'uuid': recv_uuid
+        'uuid': order_result['uuid']
     }
     query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
     m = hashlib.sha512()
@@ -61,13 +64,26 @@ def check_order(recv_uuid):
         'Authorization': authorization,
     }
 
-    res = requests.get(server_url + '/v1/order', params=params, headers=headers)
-    data = res.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
+            data = await res.json()
 
-    logging.info(f"UPBIT_RESPONSE|QUANTITY|{data}")
-    return data['executed_volume']
+    #res = requests.get(server_url + '/v1/order', params=params, headers=headers)
+    #data = res.json()
+    try:
+        async with lock:
+            logging.info("UPBIT 주문 확인 결과")
+            logging.info(f"UPBIT_REQUEST|uuid|{order_result['uuid']}")
+            logging.info(f"UPBIT_RESPONSE|{data}")
+            for trade in data['trades']:
+                order_result['upbit_price'] += float(trade['price'])
+            order_result['upbit_quantity'] = float(data['executed_volume'])
+    except:
+        logging.info("UPBIT 주문 확인 실패")
 
-async def spot_order(ticker, side, price, volume, lock):
+async def spot_order(ticker, side, price, volume, order_result, lock):
+    #upbit_start_date = datetime.now()
+    #print(f"UPBIT_START|{upbit_start_date}")
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
@@ -79,11 +95,9 @@ async def spot_order(ticker, side, price, volume, lock):
     if side == 'bid':
         params['price'] = price
         params['ord_type'] = 'price'
-        logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|PRICE|{price}")
     elif side == 'ask':
         params['ord_type'] = 'market'
         params['volume'] = volume
-        logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{volume}")
 
     query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
     m = hashlib.sha512()
@@ -102,13 +116,24 @@ async def spot_order(ticker, side, price, volume, lock):
     headers = {
         'Authorization': authorization,
     }
-    await lock.acquire()
-    res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
-    data = res.json()
-    logging.info(f"UPBIT_RESPONSE|{data}")
-    lock.release()
-    #logging.info(f"UPBIT_RESPONSE|UUID|{data['uuid']}")
-    #quantity = float(check_order(data['uuid']))
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(server_url + '/v1/orders', json=params, headers=headers) as res:
+            data = await res.json()
+
+    #res = requests.post(server_url + '/v1/orders', json=params, headers=headers)
+    #data = res.json()
+    try:
+        async with lock:
+            logging.info("UPBIT 주문 결과")
+            if side == 'bid':
+                logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|PRICE|{price}")
+            elif side == 'ask':
+                logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{volume}")
+                logging.info(f"UPBIT_RESPONSE|{data}")
+                order_result['uuid'] = data['uuid']
+    except:
+        logging.info("UPBIT 주문 실패")
 
 async def connect_socket_spot_orderbook(exchange_data, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
@@ -286,9 +311,53 @@ async def connect_socket_spot_ticker(exchange_data):
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
 
+async def test1(lock):
+    date = datetime.now()
+    async with lock:
+        await asyncio.sleep(1)
+        print(f"TEST1 {date}")
 
+async def test2(lock):
+    date = datetime.now()
+    async with lock:
+        await asyncio.sleep(2)
+        print(f"TEST2 {date}")
+    print(datetime.now())
+async def test():
+    print("TEST")
+    # 주문 로직
+    upbit_market = 'KRW-' + "BTC"
+    upbit_side = 'bid'
+    upbit_price = 10000
+    binance_market = "BTC"+ 'USDT'
+    binance_side = 'ask'
+
+    #order_result = {'uuid': 0, 'orderId': 0, 'upbit_price': 0, 'upbit_quantity': 0, 'binance_price': 0,
+    #                'binance_quantity': 0}
+
+    await asyncio.wait([
+        asyncio.create_task(spot_order(upbit_market, upbit_side, upbit_price, 0))
+        , asyncio.create_task(binance.futures_order(binance_market, binance_side, 0))
+    ])
+
+    await asyncio.gather(
+        spot_order(upbit_market, upbit_side, upbit_price, 0),
+        binance.futures_order(binance_market, binance_side, 0)
+    )
+    '''
+    lock = asyncio.Lock()
+   
+    await asyncio.gather(
+        test1(lock),
+        test2(lock)
+    )'''
 if __name__ == "__main__":
-    print(round(0.341064120,1))
+    asyncio.run(test())
+
+
+
+
+    #check_order('e96eb41c-6057-463b-9512-81a35e220a60')
     #get_all_ticker()
     #open_quantity = spot_order('KRW-AVAX', 'bid', '10000', '10')
     #open_quantity = float(1.34317089)

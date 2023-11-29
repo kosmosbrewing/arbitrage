@@ -71,24 +71,6 @@ class Premium:
 
             except Exception as e:
                 logging.info(traceback.format_exc())
-
-    async def compare_price(self):
-        await asyncio.sleep(COMPARE_PRICE_START_DELAY)
-        while True:
-            try:
-                await asyncio.sleep(COMPARE_PRICE_DELAY)
-                orderbook_check = self.orderbook_check.copy()
-                exchange_data = self.exchange_data.copy()
-                socket_connect = self.socket_connect.copy()
-
-                if sum(socket_connect) < 2:
-                    print(f"Socket 연결 끊어 짐(정상 2) : {sum(socket_connect)}, compare_price PASS!")
-                elif sum(socket_connect) == 2:
-                    comparePrice.compare_price(exchange_data, orderbook_check)
-
-            except Exception as e:
-                logging.info(traceback.format_exc())
-
     async def check_orderbook(self):
         await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
         while True:
@@ -109,20 +91,20 @@ class Premium:
                 trade_data = self.trade_data.copy()
                 position_data = self.position_data.copy()
 
-                trade_message = ''
+                message = ''
                 for ticker in trade_data:
                     if trade_data[ticker]['profit_count'] > 1:
-                        trade_message += f"💵티커: {ticker}|수익: {round(trade_data[ticker]['total_profit'],2)}원 \n"
-                if len(trade_message) > 0:
-                    await util.send_to_telegram(trade_message)
+                        message += f"💵티커: {ticker}|수익: {round(trade_data[ticker]['total_profit'],2)}원 \n"
 
-                position_message = ''
                 for ticker in position_data:
                     if position_data[ticker]['position'] == 1:
-                        position_message += (f"🌝티커: {ticker}|진입 금액: {round(trade_data[ticker]['open_bid_price_accum'],2)}원"
+                        message += (f"🌝티커: {ticker}|진입 금액: {round(trade_data[ticker]['open_bid_price_accum'],2)}원"
                                     f"|진입 김프: {position_data[ticker]['position_gimp']}% \n")
-                if len(position_message) > 0:
-                    await util.send_to_telegram(position_message)
+                if len(message) > 0:
+                    await util.send_to_telegram(message)
+                else:
+                    message = f"🌚 진입, 수익 정보 없음"
+                    await util.send_to_telegram(message)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -142,7 +124,7 @@ class Premium:
         while True:
             try:
                 binance.get_quantity_precision(self.exchange_data)
-                await asyncio.sleep(32400)
+                await asyncio.sleep(62800)
             except Exception as e:
                 logging.info(traceback.format_exc())
 

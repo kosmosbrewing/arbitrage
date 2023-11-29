@@ -4,7 +4,6 @@ import logging
 from consts import *
 
 
-@profile
 def check_orderbook(orderbook_info, orderbook_check):
     # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
     for ticker in orderbook_info:
