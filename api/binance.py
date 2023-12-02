@@ -74,19 +74,20 @@ async def check_order(ticker, order_result, lock):
     # 서명을 요청 파라미터에 추가
     # server_url = f'{server_url}?{query_string}&signature={signature}'
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(server_url, headers=headers, params=payload) as res:
-            data = await res.json()
-
     try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(server_url, headers=headers, params=payload) as res:
+                data = await res.json()
+
         async with lock:
             logging.info("BINANCE 주문 확인 결과")
             logging.info(f"BINANCE_REQUEST|{ticker}|orderId|{order_result['orderId']}")
             logging.info(f"BINANCE_RESPONSE|{data}")
             order_result['binance_price'] = float(data['avgPrice'])
             order_result['binance_quantity'] = float(data['executedQty'])
-    except:
+    except Exception as e:
         logging.info("BINANCE 주문 확인 실패")
+        logging.info(f"Exception : {e}")
 
 async def futures_order(ticker, side, quantity, order_result, lock):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
@@ -119,20 +120,22 @@ async def futures_order(ticker, side, quantity, order_result, lock):
     # 서명을 요청 파라미터에 추가
     server_url = f'{server_url}?{query_string}&signature={signature}'
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(server_url, headers=headers) as res:
-            data = await res.json()
-
-    #res = requests.post(server_url, headers=headers)
-    #data = res.json()
     try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(server_url, headers=headers) as res:
+                data = await res.json()
+
+        #res = requests.post(server_url, headers=headers)
+        #data = res.json()
+
         async with lock:
             logging.info("BINANCE 주문 결과")
             logging.info(f"BINANCE_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{quantity}")
             logging.info(f"BINANCE_RESPONSE|{data}")
             order_result['orderId'] = data['orderId']
-    except:
+    except Exception as e:
         logging.info("BINANCE 주문 실패")
+        logging.info(f"Exception : {e}")
 async def futures_order_all(ticker, side):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
@@ -216,10 +219,12 @@ async def connect_socket_futures_orderbook(exchange_data, orderbook_info, socket
                         if not ticker:  # ticker가 없는 데이터의 경우 저장 불가
                             continue
 
+                        '''
                         if 'USD' in exchange_data:
                             usd_price = exchange_data['USD']['base']
                         else:
                             usd_price = 0
+                        '''
 
                         ask_len = len(data['a'])
                         bid_len = len(data['b'])
@@ -235,27 +240,26 @@ async def connect_socket_futures_orderbook(exchange_data, orderbook_info, socket
 
                         if ask_len > ORDERBOOK_SIZE:
                             for i in range(0, ORDERBOOK_SIZE):
-                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * TETHER
                                 orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_size'] = data['a'][i][1]
                         else:
                             for i in range(0, ask_len):
-                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_price'] = float(data['a'][i][0]) * TETHER
                                 orderbook_info[ticker][exchange]["orderbook_units"][i]['ask_size'] = data['a'][i][1]
                         j = 0
                         if bid_len > ORDERBOOK_SIZE:
                             for i in range(bid_len-1, bid_len-1-ORDERBOOK_SIZE, -1):
-                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * TETHER
                                 orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_size'] = data['b'][i][1]
                                 j += 1
                         else:
                             for i in range(bid_len-1, -1, -1):
-                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * usd_price
+                                orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * TETHER
                                 orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_size'] = data['b'][i][1]
                                 j += 1
 
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
-                            logging.info(f"환율: {usd_price}")
                             logging.info(f"{exchange} WebSocket 데이터 수신 Timeout {SOCKET_PING_TIMEOUT}초 후 재연결 합니다.")
                             pong = await websocket.ping()
                             await asyncio.wait_for(pong, timeout=SOCKET_PING_TIMEOUT)
