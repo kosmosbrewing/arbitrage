@@ -35,6 +35,10 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
         if open_bid_btc == 0 or open_ask_btc == 0:
             continue
 
+        open_gimp = round(open_bid / open_ask * 100 - 100, 2)
+        close_gimp = round(close_bid / close_ask * 100 - 100, 2)
+        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
+        '''
         # 거래소간의 가격차이(%)
         if open_bid > open_ask:
             open_gimp = round((open_bid - open_ask) / open_ask * 100, 2)
@@ -49,7 +53,7 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
         if open_bid_btc > open_ask_btc:
             btc_open_gimp = round((open_bid_btc - open_ask_btc) / open_ask_btc * 100, 2)
         elif open_ask_btc > open_bid_btc:
-            btc_open_gimp = round((open_ask_btc - open_bid_btc) / open_bid_btc * 100, 2) * -1
+            btc_open_gimp = round((open_ask_btc - open_bid_btc) / open_bid_btc * 100, 2) * -1'''
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -96,7 +100,7 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
             message += "|OPEN_CNT|{}".format(sum(accum_ticker_count[ticker]))
             message += "|AMOUNT|{}/{}".format(f"{orderbook_check[ticker][base_exchange]['ask_amount']:,.0f}",
                 f"{orderbook_check[ticker][compare_exchange]['bid_amount']:,.0f}")
-            message += "|DOLLAR|{}".format(exchange_data["USD"]['base'])
+            message += "|DOLLAR|{}".format(TETHER)
         except:
             message += "호가미수신"
 
