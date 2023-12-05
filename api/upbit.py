@@ -63,23 +63,26 @@ async def check_order(order_result, lock):
     headers = {
         'Authorization': authorization,
     }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
-            data = await res.json()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
+                data = await res.json()
 
     #res = requests.get(server_url + '/v1/order', params=params, headers=headers)
     #data = res.json()
-    try:
+
         async with lock:
             logging.info("UPBIT 주문 확인 결과")
             logging.info(f"UPBIT_REQUEST|uuid|{order_result['uuid']}")
             logging.info(f"UPBIT_RESPONSE|{data}")
+
             for trade in data['trades']:
-                order_result['upbit_price'] += float(trade['price'])
-            order_result['upbit_quantity'] = float(data['executed_volume'])
-    except:
+                order_result['upbit_price'] += float(trade['price']) * float(trade['volume'])
+                order_result['upbit_quantity'] += float(trade['volume'])
+            order_result['upbit_price'] = order_result['upbit_price'] / order_result['upbit_quantity']
+    except Exception as e:
         logging.info("UPBIT 주문 확인 실패")
+        logging.info(f"Exception : {e}")
 
 async def spot_order(ticker, side, price, volume, order_result, lock):
     #upbit_start_date = datetime.now()
@@ -130,10 +133,11 @@ async def spot_order(ticker, side, price, volume, order_result, lock):
                 logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|PRICE|{price}")
             elif side == 'ask':
                 logging.info(f"UPBIT_REQUEST|{ticker}|SIDE|{side}|QUANTITY|{volume}")
-                logging.info(f"UPBIT_RESPONSE|{data}")
-                order_result['uuid'] = data['uuid']
-    except:
+            logging.info(f"UPBIT_RESPONSE|{data}")
+            order_result['uuid'] = data['uuid']
+    except Exception as e:
         logging.info("UPBIT 주문 실패")
+        logging.info(f"Exception : {e}")
 
 async def connect_socket_spot_orderbook(exchange_data, orderbook_info, socket_connect):
     """UPBIT 소켓연결 후 실시간 가격 저장"""

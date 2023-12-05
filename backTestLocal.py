@@ -11,7 +11,9 @@ def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum
         # open_install_count =  분할매수 횟수
         # close_count = 손절로직 동작 체크 횟수
         position_data[ticker] = {"open_install_count": 0, "close_install_count": 0, "position": 0, "position_gimp": 0,
-                                 "position_gimp_accum": 0, "close_count": 0, "accum_open_install_count": 0}
+                                 "position_gimp_accum": [], "close_count": 0, "accum_open_install_count": 0,
+                                 "position_gimp_accum_weight": [], "front_close_gimp": 0
+                                 }
     if ticker not in trade_data:
         # open_bid_price =  포지션 진입 업비트 현물 매수 총 금액
         # open_ask_price = 포지션 종료 업비트 현물 매도 총 금액
@@ -53,15 +55,15 @@ def get_measure_ticker():
             split_data = line.split('|')
             date_time = split_data[0].split('[INFO')[0]
             ticker = split_data[1]
-            open_gimp = float(split_data[5])
-            open_data = split_data[6].split('/')
+            open_gimp = float(split_data[3])
+            open_data = split_data[4].split('/')
             open_bid = float(open_data[0].replace(',', ''))  ## 매수 평단가
             open_ask = float(open_data[1].replace(',', ''))  ## 매도(숏) 평단가
-            close_gimp = float(split_data[8])
-            close_data = split_data[9].split('/')
+            close_gimp = float(split_data[6])
+            close_data = split_data[7].split('/')
             close_bid = float(close_data[0].replace(',', ''))  ## 매도(매수 종료) 평단가
             close_ask = float(close_data[1].replace(',', ''))  ## 매수(매도(숏) 종료) 평단가
-            btc_open_gimp = float(split_data[11])
+            btc_open_gimp = float(split_data[9])
         except:
             continue
 

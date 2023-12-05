@@ -1,5 +1,3 @@
-from logging.handlers import TimedRotatingFileHandler
-
 import telegram
 import asyncio
 import aiohttp
@@ -7,18 +5,12 @@ import logging
 import datetime
 import json
 import os
+from logging.handlers import TimedRotatingFileHandler
 from consts import *
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 bot = None
 chat_id_list = None
-
-# 오늘 날짜 가져오기
-now_date = datetime.date.today()
-today = now_date.strftime("%Y%m%d")
-# 하루 전 날짜 계산
-yesterday = now_date - datetime.timedelta(days=1)
-yesterday = yesterday.strftime("%Y%m%d")
 
 def setup_collect_logging():
     logging.basicConfig(level=logging.INFO)
@@ -184,14 +176,14 @@ def is_need_reset_socket(start_time):
     else:
         return
 
-def load_remain_position(position_data, trade_data):
+def load_remain_position(position_data, trade_data, position_ticker_count):
     if ENV == 'real':
-        get_position_path = '/root/arbitrage/conf/position_data.DAT'
+        load_path = '/root/arbitrage/conf/position_data.DAT'
     elif ENV == 'local':
-        get_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
 
-    if os.path.exists(get_position_path):
-        with open(get_position_path, 'r', encoding='utf-8') as file:
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
 
         for line in lines:
@@ -201,24 +193,25 @@ def load_remain_position(position_data, trade_data):
                 type = split_data[1]
                 data = split_data[2]
                 if type == 'POSITION':
+                    position_ticker_count['count'] += 1
                     position_data[ticker] = json.loads(data)
                     logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{position_data[ticker] }")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
                     logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{trade_data[ticker]}")
-            except:
-                continue
+            except Exception as e:
+                logging.info(e)
     else:
-        logging.info(f"{get_position_path} There is no file")
+        logging.info(f"{load_path} There is no file")
 
 def put_remain_position(position_data, trade_data):
-    put_position_path = ''
+    put_path = ''
     put_data = ''
 
     if ENV == 'real':
-        put_position_path = '/root/arbitrage/conf/position_data.DAT'
+        put_path = '/root/arbitrage/conf/position_data.DAT'
     elif ENV == 'local':
-        put_position_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
 
     for ticker in position_data:
         if position_data[ticker]['position'] == 1:
@@ -226,10 +219,66 @@ def put_remain_position(position_data, trade_data):
             put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
             #logging.info(f"{ticker}|POSITION_TRADE_FILE_PUT")
 
-    with open(put_position_path, 'w') as file:
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
+def load_profit_data(message):
+    year_month = datetime.now().strftime("%Y%m")
+    if ENV == 'real':
+        load_path = '/root/arbitrage/conf/profit_data_'+year_month+'.DAT'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_data_'+year_month+'.DAT'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        acc_profit = 0
+        acc_profit_rate =0
+        for line in lines:
+            try:
+                split_data = line.split('|')
+                ticker = split_data[1]
+                profit = split_data[7]
+                profit_rate = split_data[9]
+
+                acc_profit += float(profit)
+                acc_profit_rate += float(profit_rate)
+            except:
+                continue
+
+        if acc_profit > 0:
+            logging.info(f"LOAD_PROFIT_DATA|{acc_profit}|{acc_profit_rate}")
+            message = f"{round(acc_profit,2):,}원|{round(acc_profit_rate,2)}%"
+        return message
+    else:
+        logging.info(f"{load_path} There is no file")
+
+def put_profit_data(ticker, open_gimp, close_gimp, profit, balance):
+    put_path = ''
+
+    year_month = datetime.now().strftime("%Y%m")
+    time = datetime.now().strftime("%Y-%m-%d %H:%m")
+    if ENV == 'real':
+        put_path = '/root/arbitrage/conf/profit_data_'+year_month+'.DAT'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_data_'+year_month+'.DAT'
+
+    put_data = (
+            str(time) + '|' + str(ticker) + "|OPEN|" + str(open_gimp) + '|CLOSE|' + str(close_gimp)
+            + '|PROFIT|' + str(profit) + '|PROFIT_RATE|' + str(round(float(profit)/(float(balance) * 3) * 100, 2)) + '\n'
+    )
+    with open(put_path, 'a') as file:
         file.write(put_data)
 
 def load_history_data():
+    # 오늘 날짜 가져오기
+    now_date = datetime.date.today()
+    today = now_date.strftime("%Y%m%d")
+    # 하루 전 날짜 계산
+    yesterday = now_date - datetime.timedelta(days=1)
+    yesterday = yesterday.strftime("%Y%m%d")
+
     if ENV == 'real':
         history_file_path = '/root/arbitrage/log/premium_data_'+yesterday
     elif ENV == 'local':

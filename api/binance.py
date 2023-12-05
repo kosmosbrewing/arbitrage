@@ -30,7 +30,7 @@ def get_all_book_ticker():
 
     return [s['symbol'].lower() + "@depth" for s in res['symbols'] if "USDT" in s['symbol']]
 
-def get_quantity_precision(exchange_data):
+def get_binance_order_data(exchange_data):
     """데이터 수신할 SYMBOL 목록"""
     res = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
     res = res.json()
@@ -38,10 +38,28 @@ def get_quantity_precision(exchange_data):
     for s in res['symbols']:
         if "USDT" in s['symbol']:
             ticker = s['symbol'].replace("USDT", "")
-            exchange_data[ticker] = {'quantity_precision': s['quantityPrecision']}
+            exchange_data[ticker] = {
+                'quantity_precision': s['quantityPrecision'],
+                'min_notional': float(s['filters'][5]['notional'])
+            }
+    logging.info(f"Binance Quantity Precision 요청 : {exchange_data}")
+    #print([s['symbol'].lower() + "|" + str(s['quantityPrecision']) for s in res['symbols'] if "USDT" in s['symbol']])
+
+def get_min_notional(exchange_data):
+    """데이터 수신할 SYMBOL 목록"""
+    res = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
+    res = res.json()
+
+    for s in res['symbols']:
+        if "USDT" in s['symbol']:
+            ticker = s['symbol'].replace("USDT", "")
+            print(f"{ticker} {s['filters'][5]['notional']}")
+
+            exchange_data[ticker] = {'min_notional': s['quantityPrecision']}
 
     logging.info(f"Binance Quantity Precision 요청 : {exchange_data}")
     #print([s['symbol'].lower() + "|" + str(s['quantityPrecision']) for s in res['symbols'] if "USDT" in s['symbol']])
+
 
 
 async def check_order(ticker, order_result, lock):
@@ -471,7 +489,7 @@ def change_leverage_all_ticker():
         time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
 
 if __name__ == "__main__":
-    check_order('EGLDUSDT', 5918332535)
+    get_binance_order_data({})
     #change_leverage_all_ticker()
 
     #exchange_data = {}

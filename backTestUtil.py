@@ -43,7 +43,7 @@ def load_history_data():
     # 오늘 날짜 가져오기
     if ENV == 'real':
         history_file_path = '/root/arbitrage/log/premium_data_' + yesterday
-
+        history_file_path = '/root/arbitrage/log/premium_data_all'
     elif ENV == 'local':
         history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_all'
 

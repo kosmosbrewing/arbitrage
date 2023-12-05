@@ -37,9 +37,9 @@ async def make_graph():
             hour_min_second = date_hour + ":" + date_min + ":" + date_second
 
             ticker = split_data[1]
-            open_gap = float(split_data[5])
-            close_gap = float(split_data[8])
-            btc_open_gap = float(split_data[11])
+            open_gap = float(split_data[3])
+            close_gap = float(split_data[6])
+            btc_open_gap = float(split_data[9])
         except:
             continue
 
@@ -50,12 +50,12 @@ async def make_graph():
         front_close_gap = front_gap[ticker]['front_close_gap']
         front_btc_open_gap = front_gap[ticker]['front_btc_open_gap']
 
+        if abs(open_gap - front_open_gap) > 3 or abs(close_gap - front_close_gap) > 3 or abs(btc_open_gap - front_btc_open_gap) > 3:
+            continue
+
         front_gap[ticker]['front_open_gap'] = open_gap
         front_gap[ticker]['front_close_gap'] = close_gap
         front_gap[ticker]['front_btc_open_gap'] = btc_open_gap
-
-        if abs(open_gap - front_open_gap) > 3 or abs(close_gap - front_close_gap) > 3 or abs(btc_open_gap - front_btc_open_gap) > 3:
-            continue
 
         # 전일자 데이터 담기
         if ticker in measure_ticker:

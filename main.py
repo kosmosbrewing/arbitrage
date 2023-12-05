@@ -25,8 +25,8 @@ class Premium:
         self.check_data = {}
         self.trade_data = {}
         self.position_data = {}
-        self.accum_ticker_count = {}
-        self.accum_ticker_data = {}
+        self.acc_ticker_count = {}
+        self.acc_ticker_data = {}
         self.remain_bid_balance = {"balance": BALANCE}
         self.position_ticker_count = {"count": 0}
 
@@ -38,7 +38,7 @@ class Premium:
 
         await asyncio.wait([
             #asyncio.create_task(self.get_usd_price())
-            asyncio.create_task(self.get_quantity_precision())
+            asyncio.create_task(self.get_binance_order_data())
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchange_data, self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchange_data, self.orderbook_info, self.socket_connect))
             , asyncio.create_task(self.compare_price_order())
@@ -49,10 +49,10 @@ class Premium:
     async def compare_price_order(self):
         await asyncio.sleep(COMPARE_PRICE_START_DELAY)
 
-        util.load_remain_position(self.position_data, self.trade_data)
+        util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
         for ticker in self.trade_data:
-            self.remain_bid_balance['balance'] -= self.trade_data[ticker]['open_bid_price_accum'] - self.trade_data[ticker]['close_bid_price_accum']
-        logging.info(f"REMAIN_BALANCE|{self.remain_bid_balance['balance']}")
+            self.remain_bid_balance['balance'] -= self.trade_data[ticker]['open_bid_price_acc'] - self.trade_data[ticker]['close_bid_price_acc']
+        logging.info(f"REMAIN_BALANCE|{self.remain_bid_balance['balance']}|REMAIN_POSITION_COUNT|{self.position_ticker_count['count']}")
 
         while True:
             try:
@@ -66,7 +66,7 @@ class Premium:
                 elif sum(socket_connect) == 2:
                     await comparePriceOrder.compare_price_order(orderbook_check, exchange_data, self.remain_bid_balance,
                                             self.check_data, self.trade_data, self.position_data,
-                                            self.accum_ticker_count, self.accum_ticker_data, self.position_ticker_count)
+                                            self.acc_ticker_count, self.acc_ticker_data, self.position_ticker_count)
                 util.put_remain_position(self.position_data, self.trade_data)
 
             except Exception as e:
@@ -83,28 +83,36 @@ class Premium:
                 logging.info(traceback.format_exc())
 
     async def get_profit_position(self):
-        """ 두나무 API를 이용해 달러가격을 조회하는 함수
-        while문을 통해 일정 주기를 기준으로 무한히 반복 """
+        await asyncio.sleep(3*60)
+
         while True:
             try:
-                await asyncio.sleep(POSITION_PROFIT_UPDATE)
                 trade_data = self.trade_data.copy()
                 position_data = self.position_data.copy()
 
                 message = ''
-                for ticker in trade_data:
-                    if trade_data[ticker]['profit_count'] > 1:
-                        message += f"💵티커: {ticker}|수익: {round(trade_data[ticker]['total_profit'],2)}원 \n"
-
                 for ticker in position_data:
                     if position_data[ticker]['position'] == 1:
-                        message += (f"🌝티커: {ticker}|진입 금액: {round(trade_data[ticker]['open_bid_price_accum'],2)}원"
+                        message += (f"🌝티커: {ticker}|진입 금액: {round(trade_data[ticker]['open_bid_price_acc'],2):,}원"
                                     f"|진입 김프: {position_data[ticker]['position_gimp']}% \n")
                 if len(message) > 0:
                     await util.send_to_telegram(message)
                 else:
-                    message = f"🌚 진입, 수익 정보 없음"
+                    message = f"🌚 진입 정보 없음"
                     await util.send_to_telegram(message)
+
+                message = ''
+                message = util.load_profit_data(message)
+
+                if len(message) > 0:
+                    message = f"💵이번 달 총 수익: {message}"
+                    await util.send_to_telegram(message)
+                else:
+                    message = f"🌚 수익 정보 없음"
+                    await util.send_to_telegram(message)
+
+                await asyncio.sleep(POSITION_PROFIT_UPDATE)
+
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -118,12 +126,12 @@ class Premium:
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-    async def get_quantity_precision(self):
+    async def get_binance_order_data(self):
         """ 두나무 API를 이용해 달러가격을 조회하는 함수
         while문을 통해 일정 주기를 기준으로 무한히 반복 """
         while True:
             try:
-                binance.get_quantity_precision(self.exchange_data)
+                binance.get_binance_order_data(self.exchange_data)
                 await asyncio.sleep(62800)
             except Exception as e:
                 logging.info(traceback.format_exc())

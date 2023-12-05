@@ -33,13 +33,12 @@ class Premium:
         util.setup_collect_logging()
 
     async def run(self):
-        await util.send_to_telegram('🚀 Start Premium Bot 🚀')
         # 달러가격 및 거래소별 소켓연결, 누적거래대금을 조회가 동작하도록 만드는 main함수
 
         await asyncio.wait([
-            asyncio.create_task(self.get_usd_price())
-            , asyncio.create_task(self.get_quantity_precision())
-            , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchagne_data, self.orderbook_info, self.socket_connect))
+            #asyncio.create_task(self.get_usd_price())
+            #asyncio.create_task(self.get_quantity_precision())
+            asyncio.create_task(upbit.connect_socket_spot_orderbook(self.exchagne_data, self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.exchagne_data, self.orderbook_info, self.socket_connect))
             , asyncio.create_task(self.compare_price())
             , asyncio.create_task(self.check_orderbook())

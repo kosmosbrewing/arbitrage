@@ -68,12 +68,12 @@ def get_measure_ticker():
             split_data = line.split('|')
             date_time = split_data[0].split('[INFO')[0]
             ticker = split_data[1]
-            open_gap = float(split_data[5])
-            open_data = split_data[6].split('/')
+            open_gap = float(split_data[3])
+            open_data = split_data[4].split('/')
             open_bid = float(open_data[0].replace(',', '')) ## 매수 평단가
             open_ask = float(open_data[1].replace(',', '')) ## 매도(숏) 평단가
-            close_gap = float(split_data[8])
-            close_data = split_data[9].split('/')
+            close_gap = float(split_data[6])
+            close_data = split_data[7].split('/')
             close_bid = float(close_data[0].replace(',', '')) ## 매도(매수 종료) 평단가
             close_ask = float(close_data[1].replace(',', '')) ## 매수(매도(숏) 종료) 평단가
         except:
@@ -107,7 +107,7 @@ def get_measure_ticker():
 
         close_diff_gap = check_data[ticker]['close_gap'] - check_data[ticker]['open_gap']
 
-        if close_diff_gap > 1.5:
+        if close_diff_gap > 1.3:
             ## 종료 시점 금액 계산
             # 종료 시점 데이터 갱신
             check_data[ticker].update({"open_gap": open_gap, "open_bid": open_bid, "open_ask": open_ask})
