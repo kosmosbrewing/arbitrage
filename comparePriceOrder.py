@@ -39,9 +39,9 @@ async def compare_price_order(orderbook_check, exchange_data, remain_bid_balance
         if open_bid_btc == 0 or open_ask_btc == 0:
             continue
 
-        open_gimp = round(open_bid / open_ask * 100 - 100, 2)
-        close_gimp = round(close_bid / close_ask * 100 - 100, 2)
-        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
+        open_gimp = round(open_bid / open_ask * 100 - 100, 3)
+        close_gimp = round(close_bid / close_ask * 100 - 100, 3)
+        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 3)
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -125,17 +125,17 @@ async def compare_price_order(orderbook_check, exchange_data, remain_bid_balance
             elif 1.5 <= open_gimp < 2.5:
                 OPEN_INSTALLMENT = 0.18
             elif 2.5 <= open_gimp < 3.5:
-                if open_gimp < btc_open_gimp:
+                if open_gimp < btc_open_gimp * 0.95:
                     OPEN_INSTALLMENT = 0.18
                 else:
                     OPEN_INSTALLMENT = 0.1
             elif 3.5 <= open_gimp < 4.5:
-                if open_gimp < btc_open_gimp:
+                if open_gimp < btc_open_gimp * 0.95:
                     OPEN_INSTALLMENT = 0.14
                 else:
                     OPEN_INSTALLMENT = 0.06
             elif 4.5 < open_gimp:
-                if open_gimp < btc_open_gimp:
+                if open_gimp < btc_open_gimp * 0.95:
                     OPEN_INSTALLMENT = 0.12
                 else:
                     OPEN_INSTALLMENT = 0.04
@@ -364,12 +364,13 @@ async def compare_price_order(orderbook_check, exchange_data, remain_bid_balance
                         trade_data[ticker]['binance_close_quantity'] += order_result['binance_quantity']
 
                         ## 최종 수익 계산 로직
-                        open_profit = trade_data[ticker]['close_bid_price_acc'] - trade_data[ticker]['open_bid_price_acc']
-                        close_profit = trade_data[ticker]['open_ask_price_acc'] - trade_data[ticker]['close_ask_price_acc']
-                        open_fee = trade_data[ticker]['open_bid_price_acc'] * UPBIT_FEE + trade_data[ticker]['open_ask_price_acc'] * BINANCE_FEE
-                        close_fee = trade_data[ticker]['close_bid_price_acc'] * UPBIT_FEE + - trade_data[ticker]['close_ask_price_acc'] * BINANCE_FEE
+                        upbit_fee = trade_data[ticker]['open_bid_price_acc'] * UPBIT_FEE + trade_data[ticker]['open_ask_price_acc'] * UPBIT_FEE
+                        binance_fee = trade_data[ticker]['close_bid_price_acc'] * BINANCE_FEE + trade_data[ticker]['close_ask_price_acc'] * BINANCE_FEE
 
-                        trade_data[ticker]['trade_profit'] = round(open_profit + close_profit - open_fee - close_fee, 2)
+                        upbit_profit = trade_data[ticker]['close_bid_price_acc'] - trade_data[ticker]['open_bid_price_acc'] - upbit_fee
+                        binance_profit =  trade_data[ticker]['open_ask_price_acc'] - trade_data[ticker]['close_ask_price_acc'] - binance_fee
+
+                        trade_data[ticker]['trade_profit'] = round(upbit_profit + binance_profit, 2)
                         trade_data[ticker]['total_profit'] += trade_data[ticker]['trade_profit']
                         trade_data[ticker]['profit_count'] += 1
 
@@ -377,8 +378,10 @@ async def compare_price_order(orderbook_check, exchange_data, remain_bid_balance
                         message = (f"{ticker}"
                                    f"|진입종료김프|{position_data[ticker]['position_gimp']}%<->{order_close_gimp}%"
                                    f"|김프차이|{round(order_close_gimp - position_data[ticker]['position_gimp'], 2)}%"
-                                   f"|거래이익|{trade_data[ticker]['trade_profit']:,}원"
-                                   f"|수익률|{round(trade_data[ticker]['trade_profit']/(BALANCE * 2) * 100,2)}%"
+                                   f"|거래수익|{trade_data[ticker]['trade_profit']:,}원"
+                                   f"|UPBIT수익|{round(upbit_profit,2):,}원"
+                                   f"|BINANCE수익|{round(binance_profit,2):,}원"
+                                   f"|수익률|{round(trade_data[ticker]['trade_profit']/(BALANCE * 2) * 100,3)}%"
                                    f"|요청김프|{close_gimp}%"
                                    f"|주문김프|{order_close_gimp}%"
                                    f"|분할매수매도|{position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']}"

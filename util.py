@@ -78,13 +78,11 @@ async def get_chat_id():
                         chat_id_list.append(result['message']['chat']['id'])
                     chat_id_list = list(set(chat_id_list))
                     logging.info(f"Telegram Chat ID 응답 : {chat_id_list}")
-
                     return chat_id_list
                 else:
                     logging.info(f"Telegram Chat ID 요청 응답 오류: {response.status}")
         except aiohttp.ClientError as e:
             logging.info(f"Telegram 세션연결 오류: {e}")
-
 async def send_to_telegram(message):
     # 텔레그램 메시지 보내는 함수, 최대 3회 연결, 3회 전송 재시도 수행
     global bot
@@ -110,6 +108,7 @@ async def send_to_telegram(message):
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
+                
                 await asyncio.sleep(5)
             except Exception as e:
                 logging.info(f"Telegram 연결 해제... {e}")
@@ -146,21 +145,6 @@ async def send_to_telegram_image(image):
                 bot = None
                 break
 
-def clear_exchange_price(exchange, exchange_price):
-    # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
-    logging.info(f"{exchange} exchange_price 데이터 클리어 : [{exchange_price}]")
-    for ticker in exchange_price:
-        if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
-            continue
-        exchange_price[ticker][exchange] = 0
-
-def clear_exchange_price_orderbook(exchange, exchange_price_orderbook):
-    # 소켓연결이 끊어진 경우, 이전까지 받아온 데이터들은 더이상 유효하지 않기 때문에 삭제하는 역할을 하는 함수
-    logging.info(f"{exchange} exchange_price_orderbook 데이터 클리어 : [{exchange_price_orderbook}]")
-    for ticker in exchange_price_orderbook:
-        for i in range(0,ORDERBOOK_SIZE):
-            exchange_price_orderbook[ticker][exchange]['orderbook_units'][i] = {"ask_price" : 0, "bid_price" : 0,
-                                                                                "ask_size" : 0, "bid_size" : 0 }
 def is_need_reset_socket(start_time):
     #매일 오전 9시인지 확인해 9시가 넘었다면 True를 반환 (Websocket 재연결목적)
     now = datetime.now()
@@ -195,14 +179,17 @@ def load_remain_position(position_data, trade_data, position_ticker_count):
                 if type == 'POSITION':
                     position_ticker_count['count'] += 1
                     position_data[ticker] = json.loads(data)
-                    logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{position_data[ticker] }")
+                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{position_data[ticker] }")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
-                    logging.info(f"{ticker}|POSITION_TRADE_FILE_LOAD|{trade_data[ticker]}")
+                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{trade_data[ticker]}")
+                
             except Exception as e:
                 logging.info(e)
+                
     else:
         logging.info(f"{load_path} There is no file")
+        
 
 def put_remain_position(position_data, trade_data):
     put_path = ''
@@ -217,7 +204,6 @@ def put_remain_position(position_data, trade_data):
         if position_data[ticker]['position'] == 1:
             put_data += ticker + "|POSITION|" + json.dumps(position_data[ticker]) + "|\n"
             put_data += ticker + "|TRADE|" + json.dumps(trade_data[ticker]) + "|\n"
-            #logging.info(f"{ticker}|POSITION_TRADE_FILE_PUT")
 
     with open(put_path, 'w') as file:
         file.write(put_data)
@@ -248,11 +234,12 @@ def load_profit_data(message):
                 continue
 
         if acc_profit > 0:
-            logging.info(f"LOAD_PROFIT_DATA|{acc_profit}|{acc_profit_rate}")
-            message = f"{round(acc_profit,2):,}원|{round(acc_profit_rate,2)}%"
-        return message
+            logging.info(f"FILE_LOAD|PROFIT_DATA {acc_profit}|{acc_profit_rate}")
+            message = f"{round(acc_profit,2):,}원|{round(acc_profit_rate,3)}%"
     else:
         logging.info(f"{load_path} There is no file")
+        
+    return message
 
 def put_profit_data(ticker, open_gimp, close_gimp, profit, balance):
     put_path = ''
@@ -266,9 +253,54 @@ def put_profit_data(ticker, open_gimp, close_gimp, profit, balance):
 
     put_data = (
             str(time) + '|' + str(ticker) + "|OPEN|" + str(open_gimp) + '|CLOSE|' + str(close_gimp)
-            + '|PROFIT|' + str(profit) + '|PROFIT_RATE|' + str(round(float(profit)/(float(balance) * 3) * 100, 2)) + '\n'
+            + '|PROFIT|' + str(profit) + '|PROFIT_RATE|' + str(round(float(profit)/(float(balance) * 2) * 100, 3)) + '\n'
     )
     with open(put_path, 'a') as file:
+        file.write(put_data)
+
+def load_profit_count(position_data):
+    if ENV == 'real':
+        load_path = '/root/arbitrage/conf/profit_count.DAT'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_count.DAT'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                split_data = line.split('|')
+                ticker = split_data[0]
+                data = split_data[1]
+                temp_data = json.loads(data)
+                if ticker in position_data:
+                    position_data[ticker]['profit_count'] = temp_data['profit_count']
+                    position_data[ticker]['front_close_gimp'] = temp_data['front_close_gimp']
+                elif ticker not in position_data:
+                    position_data[ticker] = json.loads(data)
+                logging.info(f"FILE_LOAD|PROFIT_COUNT|{ticker}\n{position_data[ticker]}")
+                
+            except Exception as e:
+                logging.info(e)
+    else:
+        logging.info(f"{load_path} There is no file")
+        
+
+def put_profit_count(position_data):
+    put_path = ''
+    put_data = ''
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/conf/profit_count.DAT'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_count.DAT'
+
+    for ticker in position_data:
+        if position_data[ticker]['profit_count'] >= 1 and position_data[ticker]['position'] == 0:
+            put_data += ticker + "|" + json.dumps(position_data[ticker]) + "\n"
+
+    with open(put_path, 'w') as file:
         file.write(put_data)
 
 def load_history_data():

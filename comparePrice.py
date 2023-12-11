@@ -35,9 +35,9 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
         if open_bid_btc == 0 or open_ask_btc == 0:
             continue
 
-        open_gimp = round(open_bid / open_ask * 100 - 100, 2)
-        close_gimp = round(close_bid / close_ask * 100 - 100, 2)
-        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
+        open_gimp = round(open_bid / open_ask * 100 - 100, 3)
+        close_gimp = round(close_bid / close_ask * 100 - 100, 3)
+        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 3)
         '''
         # 거래소간의 가격차이(%)
         if open_bid > open_ask:
