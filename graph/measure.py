@@ -1,57 +1,6 @@
-import asyncio
 import os
-import matplotlib.pyplot as plt
 import datetime
-import math
-import util
-import numpy as np
-from consts import *
-
-def load_history_data():
-    # 오늘 날짜 가져오기
-    today = datetime.date.today()
-    # 하루 전 날짜 계산
-    yesterday = today - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime("%Y%m%d")
-
-    if ENV == 'real':
-        history_file_path = '/root/arbitrage/log/premium_data_' + yesterday
-    elif ENV == 'local':
-        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_' + yesterday
-        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231108'
-        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data'
-    if os.path.exists(history_file_path):
-        print(history_file_path)
-        with open(history_file_path, 'r', encoding='utf-8') as file:
-            lines = file.readlines()
-    else:
-        print(f"{history_file_path} 파일이 존재하지 않습니다.")
-
-    return lines
-
-def get_except_ticker():
-    # 오늘 날짜 가져오기
-    except_ticker = {}
-    lines = load_history_data()
-
-    for line in lines:
-        split_data = line.split('|')
-        date_time = split_data[0].split('[INFO')[0]
-        ticker = split_data[1]
-        open_gap = float(split_data[5])
-        open_data = split_data[6].split('/')
-        open_bid = float(open_data[0].replace(',', '')) ## 매수 평단가
-        open_ask = float(open_data[1].replace(',', '')) ## 매도(숏) 평단가
-        close_gap = float(split_data[8])
-        close_data = split_data[9].split('/')
-        close_bid = float(close_data[0].replace(',', '')) ## 매도(매수 종료) 평단가
-        close_ask = float(close_data[1].replace(',', '')) ## 매수(매도(숏) 종료) 평단가
-        usd = float(split_data[15])
-
-        curr_gap = close_gap - open_gap
-
-    return lines
-
+import graphUtil
 
 def get_measure_ticker():
     check_data = {}
@@ -59,9 +8,8 @@ def get_measure_ticker():
     position_data = {}
     measure_ticker = {}
 
-    lines = load_history_data()
+    lines = graphUtil.load_history_data()
     btc_open_gap = 0
-    remain_bid_balance = BALANCE
 
     for line in lines:
         try:
@@ -88,7 +36,7 @@ def get_measure_ticker():
             position_data[ticker] = {"open_count": 0, "open_check_gap": 0, "position": 0, "position_gap": 0,
                                     "close_count": 0, "position_gap_accum": 0, "installment_count": 0}
 
-        if open_gap > close_gap and open_gap - close_gap > CURR_GIMP_GAP:
+        if open_gap > close_gap and open_gap - close_gap > 1.0:
             continue
 
 
@@ -116,18 +64,10 @@ def get_measure_ticker():
 
             measure_ticker[ticker] = {"units": []}
 
+            if len(measure_ticker) > 10:
+                continue
+
     for ticker in measure_ticker:
         print(f"{ticker}")
 
     return measure_ticker
-
-if __name__ == "__main__":
-    a = np.array(1)
-    b = np.array(4)
-
-
-    result_multiply = np.multiply(a, b)  # 요소별 곱셈
-    result_divide = np.divide(a, b)  # 요소별 나눗셈
-
-    print(result_multiply, result_divide)
-    get_measure_ticker()

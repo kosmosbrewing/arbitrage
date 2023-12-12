@@ -1,8 +1,7 @@
 import asyncio
-import os
-import matplotlib.pyplot as plt
-import datetime
+from matplotlib import pyplot as plt
 import measure
+import graphUtil
 from measure import *
 
 async def make_graph():
@@ -11,15 +10,16 @@ async def make_graph():
     # 하루 전 날짜 계산
     yesterday = today - datetime.timedelta(days=1)
     yesterday = yesterday.strftime("%Y%m%d")
+    ENV = graphUtil.ENV
 
     if ENV == 'real':
         image_file_path = '/root/arbitrage/image/arbitrage_' + yesterday
     elif ENV == 'local':
         image_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/image/arbitrage_' + yesterday
 
-    lines = measure.load_history_data()
+    lines = graphUtil.load_history_data()
     measure_ticker = measure.get_measure_ticker()
-    
+
     # BTC랑 ETH는 무조건 추가
     measure_ticker['BTC'] = {"units": []}
     measure_ticker['ETH'] = {"units": []}
@@ -124,7 +124,9 @@ async def make_graph():
 
     #plt.show()
     for image in image_set:
-        await util.send_to_telegram_image(image)
+        message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
+        await graphUtil.send_to_telegram(message)
+        await graphUtil.send_to_telegram_image(image)
 
 if __name__ == "__main__":
     asyncio.run(make_graph())
