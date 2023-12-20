@@ -1,10 +1,8 @@
-import asyncio
-import util
-import traceback
 from collections import deque
 import logging
 from consts import *
 
+@profile
 def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count, accum_ticker_data):
     """ self.exchange_data 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     for ticker in orderbook_check:
@@ -35,25 +33,9 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
         if open_bid_btc == 0 or open_ask_btc == 0:
             continue
 
-        open_gimp = round(open_bid / open_ask * 100 - 100, 3)
-        close_gimp = round(close_bid / close_ask * 100 - 100, 3)
-        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 3)
-        '''
-        # 거래소간의 가격차이(%)
-        if open_bid > open_ask:
-            open_gimp = round((open_bid - open_ask) / open_ask * 100, 2)
-        elif open_ask > open_bid:
-            open_gimp = round((open_ask - open_bid) / open_bid * 100, 2) * -1
-
-        if close_bid > close_ask:
-            close_gimp = round((close_bid - close_ask) / close_ask * 100, 2)
-        elif close_ask > close_bid:
-            close_gimp = round((close_ask - close_bid) / close_bid * 100, 2) * -1
-
-        if open_bid_btc > open_ask_btc:
-            btc_open_gimp = round((open_bid_btc - open_ask_btc) / open_ask_btc * 100, 2)
-        elif open_ask_btc > open_bid_btc:
-            btc_open_gimp = round((open_ask_btc - open_bid_btc) / open_bid_btc * 100, 2) * -1'''
+        open_gimp = open_bid / open_ask * 100 - 100
+        close_gimp = close_bid / close_ask * 100 - 100
+        btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -92,11 +74,11 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
         message = f"Premium|{ticker}"
         try:
             #message += "{}|{}|{}|".format(ticker, base_exchange, compare_exchange)
-            message += "|OPEN|{}|{}/{}".format(open_gimp, f"{open_bid:,.2f}", f"{open_ask:,.2f}")
-            message += "|CLOSE|{}|{}/{}".format(close_gimp, f"{close_bid:,.2f}", f"{close_ask:,.2f}")
-            message += "|BTC_OPEN|{}".format(btc_open_gimp)
-            message += "|LOW_OPEN|{}".format(check_data[ticker]['open_gimp'])
-            message += "|AVG_OPEN|{}".format(round(average_open_gimp,2))
+            message += "|OPEN|{}|{}/{}".format(round(open_gimp,3), f"{round(open_bid,2):,.2f}", f"{round(open_ask,2):,.2f}")
+            message += "|CLOSE|{}|{}/{}".format(round(close_gimp,3), f"{round(close_bid,2):,.2f}", f"{round(close_ask,2):,.2f}")
+            message += "|BTC_OPEN|{}".format(round(btc_open_gimp,3))
+            message += "|LOW_OPEN|{}".format(round(check_data[ticker]['open_gimp'],3))
+            message += "|AVG_OPEN|{}".format(round(average_open_gimp,3))
             message += "|OPEN_CNT|{}".format(sum(accum_ticker_count[ticker]))
             message += "|AMOUNT|{}/{}".format(f"{orderbook_check[ticker][base_exchange]['ask_amount']:,.0f}",
                 f"{orderbook_check[ticker][compare_exchange]['bid_amount']:,.0f}")

@@ -235,7 +235,7 @@ def load_profit_data(message):
 
         if acc_profit > 0:
             logging.info(f"FILE_LOAD|PROFIT_DATA {acc_profit}|{acc_profit_rate}")
-            message = f"{round(acc_profit,2):,}원|{round(acc_profit_rate,3)}%"
+            message = f"{round(acc_profit,0):,}원|{round(acc_profit_rate,3)}%"
     else:
         logging.info(f"{load_path} There is no file")
         

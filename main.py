@@ -1,23 +1,12 @@
 import asyncio
-import checkOrderbook
-import comparePriceCloseOrder
-import comparePriceOpenCheck
-import comparePriceOpenOrder
-import comparePriceOrder
-from datetime import datetime, timezone, timedelta
-from api import upbit, binance
 import util
 import traceback
 import logging
 from consts import *
+from compareprice import comparePriceOpenOrder, comparePriceOpenCheck, comparePriceCloseOrder
+from datetime import datetime, timezone, timedelta
+from api import upbit, binance, checkOrderbook
 
-"""
-    :param exchange : 거래소 명
-    :param exchange_data : 거래소 별 가격 데이터를 저장할 딕셔너리
-    ex) {'USD': {'base': 1349.0}, 'MBL': {'Upbit': 4.29}, 'TRX': {'Upbit': 119.0} }
-    :param orderbook_info:거래소 별 거래대금 데이터를 저장할 딕셔너리
-    ex) {'BTC': {'Upbit': 214.1, 'Binance': None}}
-"""
 
 class Premium:
     def __init__(self):
@@ -43,15 +32,36 @@ class Premium:
             asyncio.create_task(self.get_binance_order_data())
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
-            #, asyncio.create_task(self.compare_price_open_order())
-            #, asyncio.create_task(self.compare_price_close_order())
-            , asyncio.create_task(self.compare_price_open_check())
             , asyncio.create_task(self.check_orderbook())
+            , asyncio.create_task(self.compare_price_open_order())
+            , asyncio.create_task(self.compare_price_close_order())
+            , asyncio.create_task(self.compare_price_open_check())
             , asyncio.create_task(self.get_profit_position())
         ])
 
+    async def get_binance_order_data(self):
+        while True:
+            try:
+                binance.get_binance_order_data(self.exchange_data)
+                await asyncio.sleep(GET_ORDER_DATA_DELAY)
+            except Exception as e:
+                logging.info(traceback.format_exc())
+
+    async def check_orderbook(self):
+        await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
+        logging.info(f"Check Orderbook 기동")
+        while True:
+            try:
+                await asyncio.sleep(0.1)
+                orderbook_info = self.orderbook_info.copy()
+                checkOrderbook.check_orderbook(orderbook_info, self.orderbook_check)
+
+            except Exception as e:
+                logging.info(traceback.format_exc())
+
     async def compare_price_open_order(self):
         await asyncio.sleep(COMPARE_PRICE_ORDER_DELAY)
+        logging.info(f"ComparePrice Open Order 기동")
         while True:
             try:
                 await asyncio.sleep(0.2)
@@ -64,13 +74,14 @@ class Premium:
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceOpenOrder.compare_price_open_order(orderbook_check, exchange_data,
-                                        self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
-                                        self.acc_ticker_count, self.acc_ticker_data, self.position_ticker_count)
+                                                                         self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
+                                                                         self.acc_ticker_count, self.acc_ticker_data, self.position_ticker_count)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
     async def compare_price_close_order(self):
         await asyncio.sleep(COMPARE_PRICE_ORDER_DELAY)
+        logging.info(f"ComparePrice Close Order 기동")
         while True:
             try:
                 await asyncio.sleep(0.2)
@@ -83,13 +94,14 @@ class Premium:
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceCloseOrder.compare_price_close_order(orderbook_check, exchange_data,
-                                        self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
-                                        self.position_ticker_count)
+                                                                           self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
+                                                                           self.position_ticker_count)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
     async def compare_price_open_check(self):
         await asyncio.sleep(COMPARE_PRICE_CHECK_DELAY)
+        logging.info(f"ComparePrice Open Check 기동")
 
         util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
         util.load_profit_count(self.position_data)
@@ -109,27 +121,20 @@ class Premium:
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceOpenCheck.compare_price_open_check(orderbook_check, self.check_data, self.trade_data,
-                                            self.position_data, self.acc_ticker_count, self.acc_ticker_data,
-                                            self.position_ticker_count)
+                                                                         self.position_data, self.acc_ticker_count, self.acc_ticker_data,
+                                                                         self.position_ticker_count)
 
                 util.put_remain_position(self.position_data, self.trade_data)
                 util.put_profit_count(self.position_data)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-    async def check_orderbook(self):
-        await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
-        while True:
-            try:
-                await asyncio.sleep(0.1)
-                orderbook_info = self.orderbook_info.copy()
-                checkOrderbook.check_orderbook(orderbook_info, self.orderbook_check)
-
-            except Exception as e:
-                logging.info(traceback.format_exc())
 
     async def get_profit_position(self):
         await asyncio.sleep(240)
+        logging.info(f"Get Profit Position 기동")
+        util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
+        util.load_profit_count(self.position_data)
         while True:
             try:
                 trade_data = self.trade_data.copy()
@@ -137,8 +142,9 @@ class Premium:
                 orderbook_check = self.orderbook_check.copy()
 
                 btc_open_gimp = 0
+                open_timestamp = []
+                open_message = {}
                 message = ''
-                TEMP_BALANCE = BALANCE
                 for ticker in position_data:
                     if position_data[ticker]['position'] == 1:
                         time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
@@ -157,13 +163,27 @@ class Premium:
                         close_gimp = round(close_bid / close_ask * 100 - 100, 2)
                         btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
 
+                        open_timestamp.append(time_object_korea)
+                        open_message[time_object_korea] = (
+                                f"🌝티커: {ticker}진입-종료"
+                                f"|{position_data[ticker]['position_gimp']}-{close_gimp}%"
+                                f"|{round(trade_data[ticker]['open_bid_price_acc'],0):,}원"
+                                f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                        )
+                        '''
                         message += (f"🌝티커: {ticker}진입-종료"
                                     f"|{position_data[ticker]['position_gimp']}-{close_gimp}%"
-                                    f"|{round(trade_data[ticker]['open_bid_price_acc'],2):,}원"
-                                    f"|{time_object_korea.strftime('%m-%d %H:%M')}\n")
-                        TEMP_BALANCE -= trade_data[ticker]['open_bid_price_acc']
-                if TEMP_BALANCE != BALANCE:
-                    message += f"💰잔액: {round(TEMP_BALANCE,2):,}|BTC김프: {btc_open_gimp}%"
+                                    f"|{round(trade_data[ticker]['open_bid_price_acc'],0):,}원"
+                                    f"|{time_object_korea.strftime('%m-%d %H:%M')}\n")'''
+
+                for i in range(len(open_timestamp)):
+                    timestamp = min(open_timestamp)
+                    temp_message = str(open_message[timestamp])
+                    message += temp_message
+                    open_timestamp.remove(timestamp)
+
+                if self.remain_bid_balance['balance'] < BALANCE:
+                    message += f"💰잔액: {round(self.remain_bid_balance['balance'], 0):,}원|BTC김프: {btc_open_gimp}%"
 
                 if len(message) > 0:
                     await util.send_to_telegram(message)
@@ -175,7 +195,8 @@ class Premium:
                 message = util.load_profit_data(message)
 
                 if len(message) > 0:
-                    message = f"💵이번 달 총 수익: {message}"
+                    message = f"💵이번 달 총 수익: {message}\n"
+                    message += await binance.funding_fee()
                     await util.send_to_telegram(message)
                 else:
                     message = f"🌚 수익 정보 없음"
@@ -185,15 +206,6 @@ class Premium:
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-    async def get_binance_order_data(self):
-        """ 두나무 API를 이용해 달러가격을 조회하는 함수
-        while문을 통해 일정 주기를 기준으로 무한히 반복 """
-        while True:
-            try:
-                binance.get_binance_order_data(self.exchange_data)
-                await asyncio.sleep(GET_ORDER_DATA_DELAY)
-            except Exception as e:
-                logging.info(traceback.format_exc())
 
 if __name__ == "__main__":
     premium = Premium()

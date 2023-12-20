@@ -2,7 +2,7 @@ from logging.handlers import TimedRotatingFileHandler
 import logging
 import datetime
 import os
-from consts import *
+from backTestConsts import *
 
 bot = None
 chat_id_list = None
@@ -19,7 +19,7 @@ def setup_logging():
     if ENV == 'real':
         log_file_path = '/root/arbitrage/log/backtest.log_' + today
     elif ENV == 'local':
-        log_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/backtest.log'
+        log_file_path = '/log/backtest.log'
 
     # 파일 핸들러 생성 및 설정
 
@@ -45,7 +45,7 @@ def load_history_data():
         history_file_path = '/root/arbitrage/log/premium_data_' + yesterday
         history_file_path = '/root/arbitrage/log/premium_data_all'
     elif ENV == 'local':
-        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_all'
+        history_file_path = '/log/premium_data_all'
 
     if os.path.exists(history_file_path):
         print(history_file_path)

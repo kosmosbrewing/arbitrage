@@ -1,8 +1,4 @@
-import asyncio
-import traceback
-import logging
 from consts import *
-
 
 def check_orderbook(orderbook_info, orderbook_check):
     # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
@@ -36,18 +32,18 @@ def check_orderbook(orderbook_info, orderbook_check):
 
                 ## bid_amount 로직 수정하기
                 if bid_amount > BALANCE and balance_bid_check == 0:
-                    balance_bid_average = round(float(bid_amount / bid_size), 2) if bid_size != 0 else 0
+                    balance_bid_average = float(bid_amount / bid_size) if bid_size != 0 else 0
                     balance_bid_check += 1
 
                 if ask_amount > BALANCE and balance_ask_check == 0:
-                    balance_ask_average = round(float(ask_amount / ask_size), 2) if ask_size != 0 else 0
+                    balance_ask_average = float(ask_amount / ask_size) if ask_size != 0 else 0
                     balance_ask_check += 1
 
             if bid_size == 0 or ask_size == 0:
                 continue
 
-            bid_average = round(float(bid_amount / bid_size), 2)
-            ask_average = round(float(ask_amount / ask_size), 2)
+            bid_average = float(bid_amount / bid_size)
+            ask_average = float(ask_amount / ask_size)
 
             orderbook_check[ticker][exchange] = \
                 {"bid_amount": bid_amount, "bid_average": bid_average,

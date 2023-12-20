@@ -1,8 +1,6 @@
 import asyncio
-import checkOrderbook
-import comparePrice
-import comparePriceOrder
-from api import upbit, binance
+from compareprice import comparePrice
+from api import upbit, binance, checkOrderbook
 import util
 import traceback
 import logging

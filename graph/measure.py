@@ -55,6 +55,12 @@ def get_measure_ticker():
 
         close_diff_gap = check_data[ticker]['close_gap'] - check_data[ticker]['open_gap']
 
+        if ticker == 'BTC' or ticker == 'ETH' or ticker == 'ETH':
+            continue
+
+        if len(measure_ticker) > 12:
+            continue
+
         if close_diff_gap > 1.3:
             ## 종료 시점 금액 계산
             # 종료 시점 데이터 갱신
@@ -63,9 +69,6 @@ def get_measure_ticker():
             position_data[ticker]['open_count'] += 1
 
             measure_ticker[ticker] = {"units": []}
-
-            if len(measure_ticker) > 10:
-                continue
 
     for ticker in measure_ticker:
         print(f"{ticker}")

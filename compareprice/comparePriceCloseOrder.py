@@ -1,52 +1,50 @@
 import traceback
-
 import util
 import logging
 import asyncio
-from datetime import datetime, timedelta
 from consts import *
+from datetime import datetime, timedelta
 from api import upbit, binance
 
 async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_balance, check_data, trade_data,
                                 position_data, position_ticker_count):
-    """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     close_message_list = []
 
+    """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     for ticker in orderbook_check:
         try:
             # 가격 정보가 없으면 pass
-            if orderbook_check[ticker]['Upbit'] is None or orderbook_check[ticker]['Binance'] is None:
+            if orderbook_check[ticker]['Binance'] is None or orderbook_check[ticker]['Upbit'] is None:
                 continue
 
-            open_bid = float(orderbook_check[ticker]['Upbit']['balance_ask_average'])
-            close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
-
-            open_ask = float(orderbook_check[ticker]['Binance']['balance_bid_average'])
-            close_ask = float(orderbook_check[ticker]['Binance']['balance_ask_average'])
-
-            open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
-            open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average'])
+            open_bid = orderbook_check[ticker]['Upbit']['balance_ask_average']
+            close_bid = orderbook_check[ticker]['Upbit']['balance_bid_average']
+            open_ask = orderbook_check[ticker]['Binance']['balance_bid_average']
+            close_ask = orderbook_check[ticker]['Binance']['balance_ask_average']
+            open_bid_btc = orderbook_check['BTC']['Upbit']['balance_ask_average']
+            open_ask_btc = orderbook_check['BTC']['Binance']['balance_bid_average']
 
             ## 가격이 없는 친구들 PASS
-            if open_bid == 0 or close_bid == 0:
-                continue
-            if open_ask == 0 or close_ask == 0:
-                continue
-            if open_bid_btc == 0 or open_ask_btc == 0:
+            if open_bid == 0 or close_bid == 0 or open_ask == 0 or close_ask == 0 or open_bid_btc == 0 or open_ask_btc == 0:
                 continue
 
-            open_gimp = round(open_bid / open_ask * 100 - 100, 3)
-            close_gimp = round(close_bid / close_ask * 100 - 100, 3)
-
-            ## 진입 중일 떄
+            open_gimp = open_bid / open_ask * 100 - 100
+            close_gimp = close_bid / close_ask * 100 - 100
 
             if position_data[ticker]['position'] == 1:
+                ## 진입 중일 떄
+                now = datetime.now()
+                three_days_ago = now - timedelta(days=3)
+                two_days_ago = now - timedelta(days=3)
+                one_days_ago = now - timedelta(days=3)
+
+                open_timestamp = position_data[ticker]['open_timestamp']
                 ## 너무 예전 포지션일 경우 탈출 갭 낮춤
-                if position_data[ticker]['open_timestamp'] < (datetime.now() - timedelta(days=3)).timestamp():
+                if open_timestamp < three_days_ago.timestamp():
                     close_gimp_gap = CLOSE_GIMP_GAP - 0.3
-                elif position_data[ticker]['open_timestamp'] < (datetime.now() - timedelta(days=2)).timestamp():
+                elif open_timestamp< two_days_ago.timestamp():
                     close_gimp_gap = CLOSE_GIMP_GAP - 0.2
-                elif position_data[ticker]['open_timestamp'] < (datetime.now() - timedelta(days=1)).timestamp():
+                elif open_timestamp < one_days_ago.timestamp():
                     close_gimp_gap = CLOSE_GIMP_GAP - 0.1
                 else:
                     close_gimp_gap = CLOSE_GIMP_GAP
@@ -76,7 +74,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         )
 
                         if order_result['uuid'] == 0 or order_result['orderId'] == 0:
-                            message = f'{ticker} 종료 실패 {position_data[ticker]["position_gimp"]}%-{order_close_gimp}%\n'
+                            message = f'{ticker} 종료 실패 {round(position_data[ticker]["position_gimp"],3)}%-{round(order_close_gimp,3)}%\n'
                             message += 'UPBIT 주문❌, ' if order_result['uuid'] == 0 else 'UPBIT 주문✅, '
                             message += 'BINANCE 주문❌' if order_result['orderId'] == 0 else 'BINANCE 주문✅'
                             await util.send_to_telegram(message)
@@ -106,9 +104,9 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             message = (f"{ticker} 분할 종료\n"
                                        f"진입종료김프: {position_data[ticker]['position_gimp']}%-{order_close_gimp}%({round(order_close_gimp - position_data[ticker]['position_gimp'], 3)}%)\n"
                                        f"분할매수매도: {position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']}\n"
-                                       f"요청김프: {close_gimp}%\n"
-                                       f"주문김프: {order_close_gimp}%\n"
-                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%/{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%)jjjjj\n"
+                                       f"요청김프: {round(close_gimp,3)}%\n"
+                                       f"주문김프: {round(order_close_gimp,3)}%\n"
+                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%/{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%)\n"
                                        f"요청가격: {close_bid:,}원/{close_ask:,}원\n"
                                        f"주문가격: {round(order_result['upbit_price'],2):,}원/{round(order_result['binance_price'],2):,}원\n"
                                        f"진입누적가격: {round(trade_data[ticker]['open_bid_price_acc'],0):,}원/{round(trade_data[ticker]['open_ask_price_acc'],0):,}원\n"
@@ -133,7 +131,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         )
                         ## 주문 제대로 안들어갈 시
                         if order_result['uuid'] == 0 or order_result['orderId'] == 0:
-                            message = f'{ticker} 종료 실패 {position_data[ticker]["position_gimp"]}%-{order_close_gimp}%\n'
+                            message = f'{ticker} 종료 실패 {round(position_data[ticker]["position_gimp"],3)}%-{round(order_close_gimp,3)}%\n'
                             message += 'UPBIT 주문❌, ' if order_result['uuid'] == 0 else 'UPBIT 주문✅, '
                             message += 'BINANCE 주문❌' if order_result['orderId'] == 0 else 'BINANCE 주문✅'
                             await util.send_to_telegram(message)
@@ -193,15 +191,16 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             util.put_profit_data(ticker, position_data[ticker]['position_gimp'], order_close_gimp, trade_data[ticker]['trade_profit'], BALANCE)
 
                             # 현재 시점으로 데이터 갱신
-                            check_data[ticker].update({
+                            check_data[ticker] = {
                                 "open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
-                                "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask}
-                            )
+                                "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
+                            }
+
                             # 포지션 데이터 초기화
                             position_data[ticker].update({
                                 "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                                 "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                                "open_timestamp": 0
+                                "open_timestamp": 0, "open_install_check": 0
                             })
                             ## profit_count, total_profit 제외하고 값 갱신
                             trade_data[ticker].update({
@@ -214,8 +213,24 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             logging.info(f'종료 데이터 초기화 (check, position, trade)')
         except Exception as e:
             logging.info(f"CloseOrder 오류: {traceback.format_exc()}")
-            continue
+
+            position_data[ticker] = {
+                "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
+                "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
+                "profit_count": 0, "front_close_gimp": 0, "open_timestamp": 0, "open_limit_count": 0,
+                "open_install_check": 0
+            }
+
+            trade_data[ticker] = {
+                "open_bid_price_acc": 0, "open_ask_price_acc": 0,
+                "close_bid_price_acc": 0, "close_ask_price_acc": 0,
+                "upbit_total_quantity": 0, "upbit_close_quantity": 0,
+                "binance_total_quantity": 0, "binance_close_quantity": 0,
+                "trade_profit": 0, "total_profit": 0
+            }
 
     for message in close_message_list:
         logging.info(f"POSITION_CLOSE|{message}")
         await util.send_to_telegram("🔴" + message)
+
+

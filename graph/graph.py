@@ -24,6 +24,7 @@ async def make_graph():
     measure_ticker['BTC'] = {"units": []}
     measure_ticker['ETH'] = {"units": []}
     measure_ticker['XRP'] = {"units": []}
+    measure_ticker['SOL'] = {"units": []}
 
     front_gap = {}
 
@@ -31,6 +32,7 @@ async def make_graph():
         try:
             split_data = line.split('|')
             date_time = split_data[0].split('[INFO')[0]
+            date = date_time.split(' ')[0].split('[')[1]
             date_hour = date_time.split(' ')[1].split(':')[0]
             date_min = date_time.split(' ')[1].split(':')[1]
             date_second = date_time.split(' ')[1].split(':')[2].split(',')[0]
@@ -89,7 +91,7 @@ async def make_graph():
         # 그래프 그리기
         plt.figure(figure_idx,figsize=(18, 12)) # 그래프 개수
         plt.subplot(subplot_loc[figure_idx][subplot_idx]) # 그래프 위치
-        plt.title(graph_ticker + '_' + yesterday)
+        plt.title(graph_ticker + '[' + date + ']')
 
         #plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
         #plt.plot(close_gap, label='close', color='red', linewidth=0.6)
@@ -123,9 +125,10 @@ async def make_graph():
         plt.savefig(image_temp, format='png')
 
     #plt.show()
+    message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
+    await graphUtil.send_to_telegram(message)
+
     for image in image_set:
-        message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
-        await graphUtil.send_to_telegram(message)
         await graphUtil.send_to_telegram_image(image)
 
 if __name__ == "__main__":

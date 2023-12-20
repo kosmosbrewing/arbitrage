@@ -1,11 +1,7 @@
 import traceback
-
 import aiohttp
 import pyupbit
-from api import binance
 from consts import *
-import util
-import asyncio
 import asyncio
 import websockets
 import json
@@ -18,8 +14,6 @@ import requests
 import uuid
 import ujson
 from urllib.parse import urlencode, unquote
-from datetime import datetime
-
 """
 Docs: https://pyupbit.readthedocs.io/en/latest/
 """
