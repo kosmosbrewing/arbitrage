@@ -1,12 +1,15 @@
 import asyncio
+
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+
 import util
 import traceback
 import logging
 from consts import *
 from compareprice import comparePriceOpenOrder, comparePriceOpenCheck, comparePriceCloseOrder
 from datetime import datetime, timezone, timedelta
-from api import upbit, binance, checkOrderbook
-
+from api import upbit, binance, checkOrderbook, checkRealGimp
 
 class Premium:
     def __init__(self):
@@ -30,6 +33,7 @@ class Premium:
 
         await asyncio.wait([
             asyncio.create_task(self.get_binance_order_data())
+            , asyncio.create_task(self.check_real_gimp())
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
             , asyncio.create_task(self.check_orderbook())
@@ -44,6 +48,21 @@ class Premium:
             try:
                 binance.get_binance_order_data(self.exchange_data)
                 await asyncio.sleep(GET_ORDER_DATA_DELAY)
+            except Exception as e:
+                logging.info(traceback.format_exc())
+
+    async def check_real_gimp(self):
+        """ 두나무 API를 이용해 달러가격을 조회하는 함수
+        while문을 통해 일정 주기를 기준으로 무한히 반복 """
+        await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
+        logging.info(f"Check Real Gimp 기동")
+        util.load_low_gimp(self.exchange_data)
+
+        while True:
+            try:
+                await asyncio.sleep(10)
+                orderbook_info = self.orderbook_info.copy()
+                await checkRealGimp.check_real_gimp(orderbook_info, self.exchange_data)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -106,8 +125,10 @@ class Premium:
         util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
         util.load_profit_count(self.position_data)
 
-        for ticker in self.trade_data:
-            self.remain_bid_balance['balance'] -= self.trade_data[ticker]['open_bid_price_acc'] - self.trade_data[ticker]['close_bid_price_acc']
+        for ticker in self.position_data:
+            if self.position_data[ticker]['position'] == 1:
+                self.remain_bid_balance['balance'] -= self.trade_data[ticker]['open_bid_price_acc'] - self.trade_data[ticker]['close_bid_price_acc']
+                logging.info(f"REMAIN_BALANCE|{self.remain_bid_balance['balance']}|{self.trade_data[ticker]['open_bid_price_acc']}-{self.trade_data[ticker]['close_bid_price_acc']}")
         logging.info(f"REMAIN_BALANCE|{self.remain_bid_balance['balance']}|REMAIN_POSITION_COUNT|{self.position_ticker_count['count']}")
 
         while True:
@@ -117,7 +138,9 @@ class Premium:
                 socket_connect = self.socket_connect.copy()
 
                 if socket_connect['Upbit'] == 0 or socket_connect['Binance'] == 0:
-                    logging.info(f"Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_check {SOCKET_RETRY_TIME}초 후 재시도")
+                    message = f"Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_check {SOCKET_RETRY_TIME}초 후 재시도"
+                    logging.info(message)
+                    await util.send_to_telegram(message)
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceOpenCheck.compare_price_open_check(orderbook_check, self.check_data, self.trade_data,
@@ -129,25 +152,21 @@ class Premium:
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-
     async def get_profit_position(self):
         await asyncio.sleep(240)
         logging.info(f"Get Profit Position 기동")
-        util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
-        util.load_profit_count(self.position_data)
+
         while True:
             try:
-                trade_data = self.trade_data.copy()
-                position_data = self.position_data.copy()
                 orderbook_check = self.orderbook_check.copy()
 
                 btc_open_gimp = 0
                 open_timestamp = []
                 open_message = {}
                 message = ''
-                for ticker in position_data:
-                    if position_data[ticker]['position'] == 1:
-                        time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
+                for ticker in self.position_data:
+                    if self.position_data[ticker]['position'] == 1:
+                        time_object_utc = datetime.utcfromtimestamp(self.position_data[ticker]['open_timestamp'])
                         time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
 
                         close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
@@ -165,16 +184,11 @@ class Premium:
 
                         open_timestamp.append(time_object_korea)
                         open_message[time_object_korea] = (
-                                f"🌝티커: {ticker}진입-종료"
-                                f"|{position_data[ticker]['position_gimp']}-{close_gimp}%"
-                                f"|{round(trade_data[ticker]['open_bid_price_acc'],0):,}원"
+                                f"🌝{ticker}({self.position_data[ticker]['open_install_count']})"
+                                f"|{self.position_data[ticker]['position_gimp']}~{close_gimp}%"
+                                f"|{round(self.trade_data[ticker]['open_bid_price_acc'],0):,}원"
                                 f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
                         )
-                        '''
-                        message += (f"🌝티커: {ticker}진입-종료"
-                                    f"|{position_data[ticker]['position_gimp']}-{close_gimp}%"
-                                    f"|{round(trade_data[ticker]['open_bid_price_acc'],0):,}원"
-                                    f"|{time_object_korea.strftime('%m-%d %H:%M')}\n")'''
 
                 for i in range(len(open_timestamp)):
                     timestamp = min(open_timestamp)
@@ -205,8 +219,23 @@ class Premium:
                 await asyncio.sleep(POSITION_PROFIT_UPDATE)
             except Exception as e:
                 logging.info(traceback.format_exc())
-
+    '''
+    def current(update: Update) -> None:
+        print("실행됐삼")
+        update.message.reply_text('다른 명령어가 실행되었습니다.')
+    def telegram_command(self) -> None:
+        try:
+            updater = Updater(TELEGRAM_BOT_TOKEN)
+            dp = updater.dispatcher
+            dp.add_handler(CommandHandler("current", self.current))
+            updater.start_polling()
+            updater.idle()
+        except Exception as e:
+            logging.info(traceback.format_exc())'''
 
 if __name__ == "__main__":
     premium = Premium()
     asyncio.run(premium.run())
+
+
+

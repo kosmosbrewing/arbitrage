@@ -41,6 +41,9 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
                 }
 
+                if exchange_data['grid_check'] == 0:
+                    continue
+
                 if open_gimp - close_gimp > CURR_GIMP_GAP:
                     continue
 
@@ -71,24 +74,24 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     if position_data[ticker]['open_install_check'] == 0:
                         continue
 
-                    if position_data[ticker]['position_gimp'] * INSTALL_WEIGHT < open_gimp:
+                    if position_data[ticker]['position_gimp'] * INSTALL_WEIGHT - 0.3 * (position_data[ticker]['open_install_count']) < open_gimp:
                         continue
 
                 if position_ticker_count['count'] < POSITION_CHECK_COUNT:
-                    if open_gimp < -1.5:
+                    if exchange_data['avg_gimp'] < -1.5:
                         open_installment = 0.2
-                    elif -1.5 <= open_gimp < 0.5:
+                    elif -1.5 <= exchange_data['avg_gimp'] < 0.5:
                         open_installment = 0.15
-                    elif 0.5 <= open_gimp < 1.5:
+                    elif 0.5 <= exchange_data['avg_gimp'] < 1.5:
                         open_installment = 0.12
-                    elif 1.5 <= open_gimp < 2.5:
+                    elif 1.5 <= exchange_data['avg_gimp'] < 2.5:
                         open_installment = 0.1
-                    elif 2.5 <= open_gimp < 3.5:
+                    elif 2.5 <= exchange_data['avg_gimp'] < 3.5:
                         threshold = btc_open_gimp * 0.9
-                        open_installment = 0.1 if open_gimp < threshold else 0.08
+                        open_installment = 0.1 if exchange_data['avg_gimp'] < threshold else 0.08
                     else:
                         threshold = btc_open_gimp * 0.9
-                        open_installment = 0.08 if open_gimp < threshold else 0.06
+                        open_installment = 0.08 if exchange_data['avg_gimp'] < threshold else 0.06
                 elif position_ticker_count['count'] >= POSITION_CHECK_COUNT:
                     open_installment = 0.1
 
@@ -96,16 +99,16 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 open_quantity = round(BALANCE * open_installment / open_bid, exchange_data[ticker]['quantity_precision'])
 
                 if open_quantity == 0 or open_ask * open_quantity < TETHER * exchange_data[ticker]['min_notional']:
-                    logging.info(f"SKIP|{ticker}|진입수량적음|{open_quantity}|PRECISION|{exchange_data[ticker]['quantity_precision']}")
+                    logging.info(f"SKIP|{ticker}|{round(open_gimp,2)}%|진입수량적음|{open_quantity}|PRECISION|{exchange_data[ticker]['quantity_precision']}")
                     continue
                 elif open_ask * open_quantity < TETHER * exchange_data[ticker]['min_notional']:
-                    logging.info(f"SKIP|{ticker}|주문금액적음|{open_ask * open_quantity:,}원|MIN_NOTIONAL|{TETHER * exchange_data[ticker]['min_notional']:,}원")
+                    logging.info(f"SKIP|{ticker}|{round(open_gimp,2)}%|주문금액적음|{open_ask * open_quantity:,}원|MIN_NOTIONAL|{TETHER * exchange_data[ticker]['min_notional']:,}원")
                     continue
 
                 upbit_open_bid_price = open_bid * open_quantity
 
                 if remain_bid_balance['balance'] - upbit_open_bid_price < 0:
-                    logging.info(f"SKIP|{ticker}|잔고부족|REMAIN_BID|{remain_bid_balance['balance']}|OPEN_BID|{upbit_open_bid_price}")
+                    logging.info(f"SKIP|{ticker}|{round(open_gimp,2)}%|잔고부족|REMAIN_BID|{remain_bid_balance['balance']}|OPEN_BID|{upbit_open_bid_price}")
                     continue
 
                 order_lock = asyncio.Lock()
@@ -171,8 +174,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
 
                     # 텔레그램 전송 및 로깅 데이터
                     message = (f"{ticker} 진입\n"
-                               f"요청김프: {round(open_gimp,3)}%\n"
-                               f"주문김프: {round(order_open_gimp,3)}%\n"
+                               f"요청주문김프: {round(open_gimp,3)}%/{round(order_open_gimp,3)}%\n"
                                f"누적진입김프: {position_data[ticker]['position_gimp']}%\n"
                                f"BTC김프: {round(btc_open_gimp, 3)}%\n"
                                f"변동성: {acc_ticker_count[ticker]['open_count']}\n"

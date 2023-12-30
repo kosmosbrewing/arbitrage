@@ -26,12 +26,12 @@ def get_all_ticker():
     return krw_ticker
     #return krw_ticker + only_in_btc
 
-def get_usd_price(exchange_data):
+def get_usd_price():
     """UPBIT 달러정보 조회"""
     data = requests.get('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD').json()
-    exchange_data["USD"] = {'base': data[0]['basePrice']}
-    logging.info('환율정보 조회 : [{}]'.format(exchange_data["USD"]))
+    usd_price = float(data[0]['basePrice'])
 
+    return usd_price
 async def check_order(order_result, lock):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
@@ -57,23 +57,25 @@ async def check_order(order_result, lock):
     headers = {
         'Authorization': authorization,
     }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
-                data = await res.json()
+    async with lock:
+        for i in range(3):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
+                        data = await res.json()
 
-        async with lock:
-            logging.info("ORDER CHECK >> UPBIT 주문 확인 결과")
-            logging.info(f"UPBIT_REQUEST >> uuid|{order_result['uuid']}")
-            logging.info(f"UPBIT_RESPONSE >> \n{data}")
+                logging.info("ORDER CHECK >> UPBIT 주문 확인 결과")
+                logging.info(f"UPBIT_REQUEST >> uuid|{order_result['uuid']}")
+                logging.info(f"UPBIT_RESPONSE >> \n{data}")
 
-            for trade in data['trades']:
-                order_result['upbit_price'] += float(trade['price']) * float(trade['volume'])
-                order_result['upbit_quantity'] += float(trade['volume'])
-            order_result['upbit_price'] = order_result['upbit_price'] / order_result['upbit_quantity']
-    except Exception as e:
-        logging.info("ORDER CHECK >> UPBIT 주문 확인 실패")
-        logging.info(f"Exception : {e}")
+                for trade in data['trades']:
+                    order_result['upbit_price'] += float(trade['price']) * float(trade['volume'])
+                    order_result['upbit_quantity'] += float(trade['volume'])
+                order_result['upbit_price'] = order_result['upbit_price'] / order_result['upbit_quantity']
+                break
+            except Exception as e:
+                logging.info("ORDER CHECK >> UPBIT 주문 확인 실패... 재시도")
+                logging.info(f"Exception : {e}")
         
 
 async def spot_order(ticker, side, price, volume, order_result, lock):
@@ -196,7 +198,6 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             socket_connect[exchange] = 1
-                            break
                     except:
                         logging.error(traceback.format_exc())
                 socket_connect[exchange] = 0

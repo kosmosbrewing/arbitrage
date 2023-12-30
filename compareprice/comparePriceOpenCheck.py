@@ -76,10 +76,9 @@ async def compare_price_open_check(orderbook_check, check_data, trade_data,
                 acc_ticker_count[ticker]['open_count'] = sum(acc_ticker_count[ticker]['data'])
 
             if position_data[ticker]['position'] == 1:
+                position_data[ticker]['open_install_check'] = 0
                 position_gimp_list.append(position_data[ticker]['position_gimp'])
                 position_ticker_list.append(ticker)
-            else:
-                position_data[ticker]['open_install_check'] = 0
 
             acc_ticker_data[ticker]['data'].append(open_gimp)
             acc_ticker_data_len = len(acc_ticker_data[ticker]['data'])
@@ -108,7 +107,7 @@ async def compare_price_open_check(orderbook_check, check_data, trade_data,
                 position_gimp_list.remove(min_position_gimp)
                 position_ticker_list.remove(min_ticker)
 
-            position_ticker_count['open_gimp_limit'] = temp_gimp * 0.93 / POSITION_CHECK_COUNT
+            position_ticker_count['open_gimp_limit'] = temp_gimp * 0.95 / POSITION_CHECK_COUNT
     except Exception as e:
         logging.info(f"OpenCheck 오류: {traceback.format_exc()}")
 

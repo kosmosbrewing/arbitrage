@@ -104,7 +104,7 @@ async def send_to_telegram(message):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
-                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
@@ -179,11 +179,10 @@ def load_remain_position(position_data, trade_data, position_ticker_count):
                 if type == 'POSITION':
                     position_ticker_count['count'] += 1
                     position_data[ticker] = json.loads(data)
-                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{position_data[ticker] }")
+                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{position_data[ticker]}")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
                     logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{trade_data[ticker]}")
-                
             except Exception as e:
                 logging.info(e)
                 
@@ -302,6 +301,41 @@ def put_profit_count(position_data):
 
     with open(put_path, 'w') as file:
         file.write(put_data)
+
+def load_low_gimp(exchange_data):
+    if ENV == 'real':
+        low_gimp_path = '/root/arbitrage/conf/low_gimp.DAT'
+    elif ENV == 'local':
+        low_gimp_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/low_gimp.DAT'
+
+    if os.path.exists(low_gimp_path):
+        with open(low_gimp_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                low_gimp = float(line)
+                exchange_data['low_gimp'] = low_gimp
+                logging.info(f"LOW_GIMP|{exchange_data['low_gimp']}")
+            except Exception as e:
+                logging.info(e)
+
+    else:
+        print(f"There is no File {low_gimp_path}")
+        logging.info(f"{low_gimp_path} There is no file")
+
+def put_low_gimp(exchange_data):
+    put_path = ''
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/conf/low_gimp.DAT'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/low_gimp.DAT'
+
+    put_data = str(exchange_data['low_gimp'])
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
 
 def load_history_data():
     # 오늘 날짜 가져오기

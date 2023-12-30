@@ -60,46 +60,51 @@ async def check_order(ticker, order_result, lock):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
     server_url = 'https://fapi.binance.com/fapi/v1/order'
-    timestamp = int(time.time() * 1000)
 
-    # 주문 정보 (예시 값)
-    payload = {
-        'symbol': ticker,  # 거래 코인
-        'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
-        'timestamp': timestamp
-    }
-    # 파라미터를 쿼리스트링 형태로 변환
-    query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
-    # 헤더 설정
-    headers = {
-        'X-MBX-APIKEY': access_key
-    }
-    # 서명 생성
-    signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
-                         digestmod=hashlib.sha256).hexdigest()
-    payload = {
-        'symbol': ticker,  # 거래 코인
-        'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
-        'timestamp': timestamp,
-        'signature': signature
-    }
-    # 서명을 요청 파라미터에 추가
-    # server_url = f'{server_url}?{query_string}&signature={signature}'
+    for i in range(5):
+        timestamp = int(time.time() * 1000)
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(server_url, headers=headers, params=payload) as res:
-                data = await res.json()
-
+        # 주문 정보 (예시 값)
+        payload = {
+            'symbol': ticker,  # 거래 코인
+            'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
+            'timestamp': timestamp
+        }
+        # 파라미터를 쿼리스트링 형태로 변환
+        query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
+        # 헤더 설정
+        headers = {
+            'X-MBX-APIKEY': access_key
+        }
+        # 서명 생성
+        signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
+                             digestmod=hashlib.sha256).hexdigest()
+        payload = {
+            'symbol': ticker,  # 거래 코인
+            'orderId': order_result['orderId'],  # 주문 유형 (시장가, 지정가 등)
+            'timestamp': timestamp,
+            'signature': signature
+        }
+        # 서명을 요청 파라미터에 추가
+        # server_url = f'{server_url}?{query_string}&signature={signature}'
         async with lock:
-            logging.info("ORDER CHECK >> BINANCE 주문 확인 결과")
-            logging.info(f"BINANCE_REQUEST >> orderId|{order_result['orderId']}")
-            logging.info(f"BINANCE_RESPONSE >> \n{data}")
-            order_result['binance_price'] = float(data['avgPrice'])
-            order_result['binance_quantity'] = float(data['executedQty'])
-    except Exception as e:
-        logging.info("ORDER CHECK >> BINANCE 주문 확인 실패")
-        logging.info(f"Exception : {e}")
+
+            try:
+                await asyncio.sleep(0.5)
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(server_url, headers=headers, params=payload) as res:
+                        data = await res.json()
+
+                logging.info("ORDER CHECK >> BINANCE 주문 확인 결과")
+                logging.info(f"BINANCE_REQUEST >> orderId|{order_result['orderId']}")
+                logging.info(f"BINANCE_RESPONSE >> \n{data}")
+                order_result['binance_price'] = float(data['avgPrice'])
+                order_result['binance_quantity'] = float(data['executedQty'])
+                break
+            except Exception as e:
+                logging.info(f"ORDER CHECK >> BINANCE 주문 확인 실패.. 재시도")
+                logging.info(f"Exception : {e}")
 
 async def futures_order(ticker, side, quantity, order_result, lock):
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
@@ -288,7 +293,6 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             socket_connect[exchange] = 1
-                            break
                 socket_connect[exchange] = 0
                 logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect[1]}")
                 await websocket.close()
@@ -339,5 +343,3 @@ def change_leverage_all_ticker():
         print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
         time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
 
-if __name__ == "__main__":
-    asyncio.run(funding_fee())

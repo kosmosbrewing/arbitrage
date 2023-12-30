@@ -23,6 +23,7 @@ COMPARE_PRICE_START_DELAY = 2 * 60        # ComparePrice 시작 딜레이
 COMPARE_PRICE_ORDER_DELAY = 3 * 60        # ComparePrice*Order 시작 딜레이
 COMPARE_PRICE_CHECK_DELAY = 90            # ComparePriceOpenCheck 시작 딜레이
 COMPARE_PRICE_CHECK = 20                  # ComparePriceOpenCheck 수행 주기
+CHECK_REAL_GIMP_DELAY = 60
 TIME_DIFF_CHECK_DELAY = 30 * 60           # 바이낸스 서버와 시간비교 주기, 30분
 POSITION_PROFIT_UPDATE = 120 * 60         # Position Profit Update 수행 주기
 
@@ -37,8 +38,9 @@ FRONT_AVERAGE_COUNT = 360  # 직전 진입 평균 김프 확인 횟수 (ex. 직�
 CLOSE_GIMP_GAP = 0.5       # 포지션 종료 조건 ( 현재 종료 김프 - 포지션 진입 김프 = 0.8)
 CLOSE_INSTALLMENT = 0.5    # 분할 종료 가중치
 BTC_GAP = 1.4              # BTC 갭
-POSITION_MAX_COUNT = 8     # 최대 들어갈 티커 개수
+POSITION_MAX_COUNT = 1     # 최대 들어갈 티커 개수
 POSITION_CHECK_COUNT = 3   # 진입 중인 다른 티커 김프 확인 개수
+GRID_CHECK_GAP = 0.7
 
 # ETC
 MILLION = 100000000    # 억
