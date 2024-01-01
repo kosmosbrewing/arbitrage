@@ -12,18 +12,14 @@ ENV = 'real'
 TELEGRAM_BOT_TOKEN = "6729803794:AAEEX8oOTfTp2iYXnCrTMcNm7aDwewuGJL0"
 TELEGRAM_MESSAGE_MAX_SIZE = 4096
 
-def load_history_data():
+def load_history_data(date):
     # 오늘 날짜 가져오기
     now_date = datetime.date.today()
-    today = now_date.strftime("%Y%m%d")
-    # 하루 전 날짜 계산
-    yesterday = now_date - datetime.timedelta(days=1)
-    yesterday = yesterday.strftime("%Y%m%d")
 
     if ENV == 'real':
-        history_file_path = '/root/arbitrage/log/premium_data_'+yesterday
+        history_file_path = '/root/arbitrage/log/premium_data_'+ str(date)
     elif ENV == 'local':
-        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_'+yesterday
+        history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_'+ str(date)
 
     if os.path.exists(history_file_path):
         logging.info(history_file_path)
@@ -39,12 +35,11 @@ def load_chat_id():
     lines = ''
     # 오늘 날짜 가져오기
     if ENV == 'real':
-        load_path = '/root/arbitrage/conf/chat_id.DAT'
+        load_path = '/root/arbitrage/data/chat_id.DAT'
     elif ENV == 'local':
-        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/chat_id.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/chat_id.DAT'
     
     if os.path.exists(load_path):
-        print(load_path)
         with open(load_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
 
@@ -59,9 +54,9 @@ def put_chat_id(chat_id_list):
 
     # 오늘 날짜 가져오기
     if ENV == 'real':
-        put_path = '/root/arbitrage/conf/chat_id.DAT'
+        put_path = '/root/arbitrage/data/chat_id.DAT'
     elif ENV == 'local':
-        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/chat_id.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/chat_id.DAT'
 
     if len(chat_id_list) > 0:
         for chat_id in chat_id_list:
@@ -96,7 +91,6 @@ def get_chat_id_list():
         temp_list = []
         for line in lines:
             chat_id = line.split('\n')[0]
-            print(f"Chat_id 취득 : {chat_id}")
             temp_list.append(chat_id)
         send_chat_id_list = list(set(temp_list))
 

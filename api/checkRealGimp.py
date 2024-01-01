@@ -68,7 +68,7 @@ async def check_real_gimp(orderbook_info, exchange_data):
             message = f"🌚 김프 추세 전환: {round(exchange_data['low_gimp'], 2)}%, 환율 : {usd_price}원"
             await util.send_to_telegram(message)
 
-        elif exchange_data['avg_gimp'] < exchange_data['low_gimp'] + GRID_CHECK_GAP and exchange_data['avg_gimp'] > exchange_data['low_gimp']:
+        elif exchange_data['avg_gimp'] < exchange_data['low_gimp'] + GRID_CHECK_GAP:
             exchange_data['grid_check'] += 1
             logging.info(f"김프 진입 그리드 설정 {round(exchange_data['low_gimp'], 2)}% <-> {round(exchange_data['low_gimp'] + GRID_CHECK_GAP, 2)}%")
             if exchange_data['grid_check'] == 1:

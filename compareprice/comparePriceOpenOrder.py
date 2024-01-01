@@ -15,6 +15,10 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
         try:
             if orderbook_check[ticker]['Binance'] is None or orderbook_check[ticker]['Upbit'] is None:
                 continue
+
+            if ticker not in ['ETH']:
+                continue
+
             open_bid = orderbook_check[ticker]['Upbit']['balance_ask_average']
             close_bid = orderbook_check[ticker]['Upbit']['balance_bid_average']
             open_ask = orderbook_check[ticker]['Binance']['balance_bid_average']
@@ -41,22 +45,52 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
                 }
 
-                if exchange_data['grid_check'] == 0:
-                    continue
-
                 if open_gimp - close_gimp > CURR_GIMP_GAP:
                     continue
 
-                if position_data[ticker]['open_install_count'] == 0 and position_ticker_count['count'] < POSITION_CHECK_COUNT:
+                if position_data[ticker]['open_install_count'] == 0:
+                    if exchange_data['grid_check'] == 0:
+                        continue
+
+                    if position_ticker_count['count'] >= POSITION_MAX_COUNT:
+                        continue
+
                     if position_data[ticker]['profit_count'] > 0 and open_gimp > position_data[ticker]['front_close_gimp'] - RE_OPEN_GIMP_GAP:
                         continue
 
+                    position_data[ticker]['open_limit_count'] += 1
+                    if position_data[ticker]['open_limit_count'] < 3:
+                        continue
+
+                    '''
                     if acc_ticker_count[ticker]['open_count'] <= OPEN_GIMP_COUNT:
                         continue
 
                     if acc_ticker_data[ticker]['fall_check'] == 0 or open_gimp > btc_open_gimp * BTC_GAP:
                         continue
+                    '''
 
+                elif position_data[ticker]['open_install_count'] > 0:
+                    '''
+                    if position_data[ticker]['open_install_check'] == 0:
+                        continue
+                    '''
+                    if exchange_data['avg_gimp'] < 1.5:
+                        install_weight = INSTALL_WEIGHT
+                    elif 1.5 <= exchange_data['avg_gimp'] < 2.5:
+                        install_weight = INSTALL_WEIGHT + 0.025
+                    elif 2.5 <= exchange_data['avg_gimp'] < 3.5:
+                        install_weight = INSTALL_WEIGHT + 0.05
+                    elif exchange_data['avg_gimp'] > 3.5:
+                        install_weight = INSTALL_WEIGHT + 0.1
+
+                    if position_data[ticker]['front_position_gimp'] - install_weight < open_gimp:
+                        continue
+
+                    position_data[ticker]['open_limit_count'] += 1
+                    if position_data[ticker]['open_limit_count'] < 3:
+                        continue
+                '''
                 elif position_data[ticker]['open_install_count'] == 0 and position_ticker_count['count'] >= POSITION_CHECK_COUNT:
                     if acc_ticker_data[ticker]['fall_check'] == 0 or open_gimp > btc_open_gimp * BTC_GAP:
                         position_data[ticker]['open_limit_count'] = 0
@@ -69,31 +103,16 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
 
                     if position_data[ticker]['open_limit_count'] < 3 or position_ticker_count['count'] >= POSITION_MAX_COUNT:
                         continue
+                '''
 
-                elif position_data[ticker]['open_install_count'] > 0:
-                    if position_data[ticker]['open_install_check'] == 0:
-                        continue
-
-                    if position_data[ticker]['position_gimp'] * INSTALL_WEIGHT - 0.3 * (position_data[ticker]['open_install_count']) < open_gimp:
-                        continue
-
-                if position_ticker_count['count'] < POSITION_CHECK_COUNT:
-                    if exchange_data['avg_gimp'] < -1.5:
-                        open_installment = 0.2
-                    elif -1.5 <= exchange_data['avg_gimp'] < 0.5:
-                        open_installment = 0.15
-                    elif 0.5 <= exchange_data['avg_gimp'] < 1.5:
-                        open_installment = 0.12
-                    elif 1.5 <= exchange_data['avg_gimp'] < 2.5:
-                        open_installment = 0.1
-                    elif 2.5 <= exchange_data['avg_gimp'] < 3.5:
-                        threshold = btc_open_gimp * 0.9
-                        open_installment = 0.1 if exchange_data['avg_gimp'] < threshold else 0.08
-                    else:
-                        threshold = btc_open_gimp * 0.9
-                        open_installment = 0.08 if exchange_data['avg_gimp'] < threshold else 0.06
-                elif position_ticker_count['count'] >= POSITION_CHECK_COUNT:
-                    open_installment = 0.1
+                if exchange_data['avg_gimp'] < 1.5:
+                    open_installment = OPEN_INSTALLMENT - 0.2
+                elif 1.5 <= exchange_data['avg_gimp'] < 2.5:
+                    open_installment = OPEN_INSTALLMENT - 0.1
+                elif 2.5 <= exchange_data['avg_gimp'] < 3.5:
+                    open_installment = OPEN_INSTALLMENT
+                elif exchange_data['avg_gimp'] > 3.5:
+                    open_installment = OPEN_INSTALLMENT
 
                 # 매수/매도(숏) 기준 가격 잡기 (개수 계산)
                 open_quantity = round(BALANCE * open_installment / open_bid, exchange_data[ticker]['quantity_precision'])
@@ -150,6 +169,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
 
                     position_data[ticker]['open_install_count'] += 1
                     position_data[ticker]['acc_open_install_count'] += 1
+                    position_data[ticker]['front_position_gimp'] = order_open_gimp
                     position_data[ticker]['position_gimp_acc'].append(order_open_gimp)
                     position_data[ticker]['position_gimp_acc_weight'].append(open_installment)
                     position_data[ticker]['open_limit_count'] = 0
@@ -201,7 +221,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                 "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
                 "profit_count": 0, "front_close_gimp": 0, "open_timestamp": 0, "open_limit_count": 0,
-                "open_install_check": 0
+                "open_install_check": 0, "front_position_gimp": 0, "close_limit_count": 0
             }
 
             trade_data[ticker] = {

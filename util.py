@@ -1,3 +1,5 @@
+import traceback
+
 import telegram
 import asyncio
 import aiohttp
@@ -6,9 +8,10 @@ import datetime
 import json
 import os
 from logging.handlers import TimedRotatingFileHandler
-from consts import *
-from datetime import datetime, timedelta
 
+from api import binance
+from consts import *
+from datetime import datetime, timezone, timedelta
 bot = None
 chat_id_list = None
 
@@ -65,6 +68,7 @@ def setup_order_logging():
     root_logger.addHandler(file_handler)
 
 
+
 async def get_chat_id():
     logging.info("Telegram Chat ID 요청합니다..")
     async with aiohttp.ClientSession() as session:
@@ -104,7 +108,7 @@ async def send_to_telegram(message):
         for i in range(3):
             try:
                 # logging.info(f"Telegram [{chat_id}], msg 전송 {message}")
-                bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
+                await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 break
             except telegram.error.TimedOut as e:
                 logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
@@ -146,25 +150,19 @@ async def send_to_telegram_image(image):
                 break
 
 def is_need_reset_socket(start_time):
-    #매일 오전 9시인지 확인해 9시가 넘었다면 True를 반환 (Websocket 재연결목적)
     now = datetime.now()
-    start_date_base_time = start_time.replace(hour=9, minute=0, second=0, microsecond=0)
-    next_base_time = (start_time + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
-    if start_time < start_date_base_time:
-        if start_date_base_time < now:
-            return True
-        else:
-            return
-    if next_base_time < now:
+    one_days_ago = now - timedelta(days=1)
+
+    if start_time < one_days_ago:
         return True
     else:
         return
 
 def load_remain_position(position_data, trade_data, position_ticker_count):
     if ENV == 'real':
-        load_path = '/root/arbitrage/conf/position_data.DAT'
+        load_path = '/root/arbitrage/data/position_data.DAT'
     elif ENV == 'local':
-        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/position_data.DAT'
 
     if os.path.exists(load_path):
         with open(load_path, 'r', encoding='utf-8') as file:
@@ -179,10 +177,10 @@ def load_remain_position(position_data, trade_data, position_ticker_count):
                 if type == 'POSITION':
                     position_ticker_count['count'] += 1
                     position_data[ticker] = json.loads(data)
-                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{position_data[ticker]}")
+                    logging.info(f"FILE_LOAD|POSITION_DATA|{ticker}")
                 elif type == 'TRADE':
                     trade_data[ticker] = json.loads(data)
-                    logging.info(f"FILE_LOAD|POSITION_TRADE|{ticker}\n{trade_data[ticker]}")
+                    logging.info(f"FILE_LOAD|TRADE_DATA|{ticker}")
             except Exception as e:
                 logging.info(e)
                 
@@ -195,9 +193,9 @@ def put_remain_position(position_data, trade_data):
     put_data = ''
 
     if ENV == 'real':
-        put_path = '/root/arbitrage/conf/position_data.DAT'
+        put_path = '/root/arbitrage/data/position_data.DAT'
     elif ENV == 'local':
-        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/position_data.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/position_data.DAT'
 
     for ticker in position_data:
         if position_data[ticker]['position'] == 1:
@@ -210,9 +208,9 @@ def put_remain_position(position_data, trade_data):
 def load_profit_data(message):
     year_month = datetime.now().strftime("%Y%m")
     if ENV == 'real':
-        load_path = '/root/arbitrage/conf/profit_data_'+year_month+'.DAT'
+        load_path = '/root/arbitrage/data/profit_data_'+year_month+'.DAT'
     elif ENV == 'local':
-        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_data_'+year_month+'.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/profit_data_'+year_month+'.DAT'
 
     if os.path.exists(load_path):
         with open(load_path, 'r', encoding='utf-8') as file:
@@ -246,9 +244,9 @@ def put_profit_data(ticker, open_gimp, close_gimp, profit, balance):
     year_month = datetime.now().strftime("%Y%m")
     time = datetime.now().strftime("%Y-%m-%d %H:%m")
     if ENV == 'real':
-        put_path = '/root/arbitrage/conf/profit_data_'+year_month+'.DAT'
+        put_path = '/root/arbitrage/data/profit_data_'+year_month+'.DAT'
     elif ENV == 'local':
-        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_data_'+year_month+'.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/profit_data_'+year_month+'.DAT'
 
     put_data = (
             str(time) + '|' + str(ticker) + "|OPEN|" + str(open_gimp) + '|CLOSE|' + str(close_gimp)
@@ -257,11 +255,45 @@ def put_profit_data(ticker, open_gimp, close_gimp, profit, balance):
     with open(put_path, 'a') as file:
         file.write(put_data)
 
+
+def load_orderbook_check(orderbook_check):
+    if ENV == 'real':
+        load_path = '/root/arbitrage/data/orderbook_check.json'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/orderbook_check.json'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                print("LOAD orderbook CHECK")
+                orderbook_check.update(json.loads(line))
+                print(orderbook_check)
+            except Exception as e:
+                logging.info(e)
+    else:
+        logging.info(f"{load_path} There is no file")
+
+def put_orderbook_check(orderbook_check):
+    put_path = ''
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/data/orderbook_check.json'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/orderbook_check.json'
+
+    put_data = json.dumps(orderbook_check)
+
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
 def load_profit_count(position_data):
     if ENV == 'real':
-        load_path = '/root/arbitrage/conf/profit_count.DAT'
+        load_path = '/root/arbitrage/data/profit_count.DAT'
     elif ENV == 'local':
-        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_count.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/profit_count.DAT'
 
     if os.path.exists(load_path):
         with open(load_path, 'r', encoding='utf-8') as file:
@@ -278,7 +310,7 @@ def load_profit_count(position_data):
                     position_data[ticker]['front_close_gimp'] = temp_data['front_close_gimp']
                 elif ticker not in position_data:
                     position_data[ticker] = json.loads(data)
-                logging.info(f"FILE_LOAD|PROFIT_COUNT|{ticker}\n{position_data[ticker]}")
+                logging.info(f"FILE_LOAD|PROFIT_COUNT|{ticker}")
                 
             except Exception as e:
                 logging.info(e)
@@ -291,9 +323,9 @@ def put_profit_count(position_data):
     put_data = ''
 
     if ENV == 'real':
-        put_path = '/root/arbitrage/conf/profit_count.DAT'
+        put_path = '/root/arbitrage/data/profit_count.DAT'
     elif ENV == 'local':
-        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/profit_count.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/profit_count.DAT'
 
     for ticker in position_data:
         if position_data[ticker]['profit_count'] >= 1 and position_data[ticker]['position'] == 0:
@@ -304,9 +336,9 @@ def put_profit_count(position_data):
 
 def load_low_gimp(exchange_data):
     if ENV == 'real':
-        low_gimp_path = '/root/arbitrage/conf/low_gimp.DAT'
+        low_gimp_path = '/root/arbitrage/data/low_gimp.DAT'
     elif ENV == 'local':
-        low_gimp_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/low_gimp.DAT'
+        low_gimp_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/low_gimp.DAT'
 
     if os.path.exists(low_gimp_path):
         with open(low_gimp_path, 'r', encoding='utf-8') as file:
@@ -328,14 +360,13 @@ def put_low_gimp(exchange_data):
     put_path = ''
 
     if ENV == 'real':
-        put_path = '/root/arbitrage/conf/low_gimp.DAT'
+        put_path = '/root/arbitrage/data/low_gimp.DAT'
     elif ENV == 'local':
-        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/conf/low_gimp.DAT'
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/low_gimp.DAT'
 
     put_data = str(exchange_data['low_gimp'])
     with open(put_path, 'w') as file:
         file.write(put_data)
-
 
 def load_history_data():
     # 오늘 날짜 가져오기
@@ -360,3 +391,54 @@ def load_history_data():
         logging.info(f"{history_file_path} 파일이 존재하지 않습니다.")
 
     return lines
+
+def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_balance):
+    # 오늘 날짜 가져오기
+    try:
+        btc_open_gimp = 0
+        open_timestamp = []
+        open_message = {}
+        message = ''
+        for ticker in position_data:
+            if position_data[ticker]['position'] == 1:
+                time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
+                time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
+
+                close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
+                close_ask = float(orderbook_check[ticker]['Binance']['balance_ask_average'])
+                open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
+                open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average'])
+
+                if close_bid == 0 or close_ask == 0:
+                    continue
+                if open_bid_btc == 0 or open_ask_btc == 0:
+                    continue
+
+                close_gimp = round(close_bid / close_ask * 100 - 100, 2)
+                btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
+
+                open_timestamp.append(time_object_korea)
+                open_message[time_object_korea] = (
+                    f"🌝{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
+                    f"|{position_data[ticker]['position_gimp']}~{close_gimp}%"
+                    f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
+                    f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                )
+
+        for i in range(len(open_timestamp)):
+            timestamp = min(open_timestamp)
+            temp_message = str(open_message[timestamp])
+            message += temp_message
+            open_timestamp.remove(timestamp)
+
+        if remain_bid_balance['balance'] < BALANCE:
+            message += f"💰잔액: {round(remain_bid_balance['balance'], 0):,}원|BTC김프: {btc_open_gimp}%"
+
+        if len(message) == 0:
+            message = f"🌚 진입 정보 없음"
+
+        return message
+    except Exception as e:
+        message = f"🌚 1분 후 재시도..."
+        logging.info(traceback.format_exc())
+        return message

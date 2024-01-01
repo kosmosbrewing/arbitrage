@@ -1,6 +1,5 @@
 import asyncio
 import sys
-
 from matplotlib import pyplot as plt
 import measure
 import graphUtil
@@ -21,7 +20,7 @@ async def make_graph(date=yesterday):
         image_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/image/arbitrage_' + str(date)
 
     lines = graphUtil.load_history_data(date)
-    measure_ticker = measure.get_measure_ticker(date)
+    measure_ticker = {}
 
     # BTC랑 ETH는 무조건 추가
     measure_ticker['BTC'] = {"units": []}
@@ -66,7 +65,6 @@ async def make_graph(date=yesterday):
         if ticker in measure_ticker:
             measure_ticker[ticker]['units'].append({"open_gap": open_gap, "close_gap": close_gap,
                                                     "btc_open_gap": btc_open_gap, "hour_min_second": hour_min_second})
-
     # 그래프 변수 초기화
     subplot_loc = []
     for i in range(0,100):
@@ -95,10 +93,6 @@ async def make_graph(date=yesterday):
         plt.figure(figure_idx,figsize=(18, 12)) # 그래프 개수
         plt.subplot(subplot_loc[figure_idx][subplot_idx]) # 그래프 위치
         plt.title(graph_ticker + '[' + date + ']')
-
-        #plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
-        #plt.plot(close_gap, label='close', color='red', linewidth=0.6)
-        #plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
 
         plt.xlabel('time')
         plt.ylabel('gap')

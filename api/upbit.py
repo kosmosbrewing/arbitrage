@@ -1,6 +1,10 @@
 import traceback
+from datetime import datetime
+
 import aiohttp
 import pyupbit
+
+import util
 from consts import *
 import asyncio
 import websockets
@@ -139,8 +143,9 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
     while True:
         try:
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
-            async with (websockets.connect('wss://api.upbit.com/websocket/v1',
-                                          ping_interval=None, ping_timeout=30, max_queue=10000) as websocket):
+
+            async with (websockets.connect('wss://api.upbit.com/websocket/v1', ping_interval=SOCKET_PING_INTERVAL,
+                                           ping_timeout=SOCKET_PING_TIMEOUT, max_queue=10000) as websocket):
                 socket_connect[exchange] = 1
                 logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook) | Socket Connect: {socket_connect}")
 
@@ -186,6 +191,11 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                             for i in range(0, orderbook_len):
                                 orderbook_info[ticker][exchange]["orderbook_units"][i] = data['orderbook_units'][i]
 
+                        '''
+                        if util.is_need_reset_socket(start_time):
+                            logging.info(f'{exchange} Websocket 연결 24시간 초과, 재연결 수행')
+                            break
+                        '''
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
                             socket_connect[exchange] = 0
@@ -194,13 +204,9 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                             await asyncio.wait_for(pong, timeout=SOCKET_PING_TIMEOUT)
                             socket_connect[exchange] = 1
                         except:
-                            socket_connect[exchange] = 0
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
-                            socket_connect[exchange] = 1
-                    except:
-                        logging.error(traceback.format_exc())
-                socket_connect[exchange] = 0
+                            break
                 logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect}")
                 await websocket.close()
         except socket.gaierror:

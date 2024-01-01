@@ -1,14 +1,9 @@
 import asyncio
-
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
-
 import util
 import traceback
 import logging
 from consts import *
 from compareprice import comparePriceOpenOrder, comparePriceOpenCheck, comparePriceCloseOrder
-from datetime import datetime, timezone, timedelta
 from api import upbit, binance, checkOrderbook, checkRealGimp
 
 class Premium:
@@ -29,7 +24,6 @@ class Premium:
 
     async def run(self):
         await util.send_to_telegram('🚀 Start Premium Bot 🚀')
-        # 달러가격 및 거래소별 소켓연결, 누적거래대금을 조회가 동작하도록 만드는 main함수
 
         await asyncio.wait([
             asyncio.create_task(self.get_binance_order_data())
@@ -83,7 +77,7 @@ class Premium:
         logging.info(f"ComparePrice Open Order 기동")
         while True:
             try:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(10)
                 orderbook_check = self.orderbook_check.copy()
                 exchange_data = self.exchange_data.copy()
                 socket_connect = self.socket_connect.copy()
@@ -103,7 +97,7 @@ class Premium:
         logging.info(f"ComparePrice Close Order 기동")
         while True:
             try:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(10)
                 orderbook_check = self.orderbook_check.copy()
                 exchange_data = self.exchange_data.copy()
                 socket_connect = self.socket_connect.copy()
@@ -149,6 +143,7 @@ class Premium:
 
                 util.put_remain_position(self.position_data, self.trade_data)
                 util.put_profit_count(self.position_data)
+                util.put_orderbook_check(self.orderbook_check)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -159,51 +154,9 @@ class Premium:
         while True:
             try:
                 orderbook_check = self.orderbook_check.copy()
+                message = util.get_profit_position(orderbook_check, self.position_data, self.trade_data, self.remain_bid_balance)
 
-                btc_open_gimp = 0
-                open_timestamp = []
-                open_message = {}
-                message = ''
-                for ticker in self.position_data:
-                    if self.position_data[ticker]['position'] == 1:
-                        time_object_utc = datetime.utcfromtimestamp(self.position_data[ticker]['open_timestamp'])
-                        time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
-
-                        close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
-                        close_ask = float(orderbook_check[ticker]['Binance']['balance_ask_average'])
-                        open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
-                        open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average'])
-
-                        if close_bid == 0 or close_ask == 0:
-                            continue
-                        if open_bid_btc == 0 or open_ask_btc == 0:
-                            continue
-
-                        close_gimp = round(close_bid / close_ask * 100 - 100, 2)
-                        btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
-
-                        open_timestamp.append(time_object_korea)
-                        open_message[time_object_korea] = (
-                                f"🌝{ticker}({self.position_data[ticker]['open_install_count']})"
-                                f"|{self.position_data[ticker]['position_gimp']}~{close_gimp}%"
-                                f"|{round(self.trade_data[ticker]['open_bid_price_acc'],0):,}원"
-                                f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
-                        )
-
-                for i in range(len(open_timestamp)):
-                    timestamp = min(open_timestamp)
-                    temp_message = str(open_message[timestamp])
-                    message += temp_message
-                    open_timestamp.remove(timestamp)
-
-                if self.remain_bid_balance['balance'] < BALANCE:
-                    message += f"💰잔액: {round(self.remain_bid_balance['balance'], 0):,}원|BTC김프: {btc_open_gimp}%"
-
-                if len(message) > 0:
-                    await util.send_to_telegram(message)
-                else:
-                    message = f"🌚 진입 정보 없음"
-                    await util.send_to_telegram(message)
+                await util.send_to_telegram(message)
 
                 message = ''
                 message = util.load_profit_data(message)
@@ -211,31 +164,21 @@ class Premium:
                 if len(message) > 0:
                     message = f"💵이번 달 총 수익: {message}\n"
                     message += await binance.funding_fee()
-                    await util.send_to_telegram(message)
                 else:
                     message = f"🌚 수익 정보 없음"
-                    await util.send_to_telegram(message)
 
+                await util.send_to_telegram(message)
                 await asyncio.sleep(POSITION_PROFIT_UPDATE)
+
             except Exception as e:
                 logging.info(traceback.format_exc())
-    '''
-    def current(update: Update) -> None:
-        print("실행됐삼")
-        update.message.reply_text('다른 명령어가 실행되었습니다.')
-    def telegram_command(self) -> None:
-        try:
-            updater = Updater(TELEGRAM_BOT_TOKEN)
-            dp = updater.dispatcher
-            dp.add_handler(CommandHandler("current", self.current))
-            updater.start_polling()
-            updater.idle()
-        except Exception as e:
-            logging.info(traceback.format_exc())'''
 
 if __name__ == "__main__":
     premium = Premium()
     asyncio.run(premium.run())
+
+
+
 
 
 

@@ -28,15 +28,16 @@ TIME_DIFF_CHECK_DELAY = 30 * 60           # 바이낸스 서버와 시간비교 
 POSITION_PROFIT_UPDATE = 120 * 60         # Position Profit Update 수행 주기
 
 ORDERBOOK_SIZE = 6         # 호가 상하방 몇틱 저장할 지 지정
-CURR_GIMP_GAP = 0.2        # 현재 진입/종료 김프 차이
+CURR_GIMP_GAP = 0.1        # 현재 진입/종료 김프 차이
+OPEN_INSTALLMENT = 0.1
 OPEN_GIMP_GAP = 0.15       # 변동성 COUNT 할 김프 조건 (ex. 현재 종료 김프 - 저점 진입 김프 = 0.3)
 RE_OPEN_GIMP_GAP = 0.5     # 재진입 티커 김프 조건
 OPEN_GIMP_COUNT = 2        # 변동성 COUNT 횟수
-INSTALL_WEIGHT = 0.7       # 분할 진입 가중치
+INSTALL_WEIGHT = 0.12      # 분할 진입 가중치
 FRONT_OPEN_COUNT = 150     # 직전 변동성 COUNT 확인 횟수 (ex. 직전 20개 확인)
 FRONT_AVERAGE_COUNT = 360  # 직전 진입 평균 김프 확인 횟수 (ex. 직전 10개 확인)
 CLOSE_GIMP_GAP = 0.5       # 포지션 종료 조건 ( 현재 종료 김프 - 포지션 진입 김프 = 0.8)
-CLOSE_INSTALLMENT = 0.5    # 분할 종료 가중치
+CLOSE_INSTALLMENT = 0.25   # 분할 종료 가중치
 BTC_GAP = 1.4              # BTC 갭
 POSITION_MAX_COUNT = 1     # 최대 들어갈 티커 개수
 POSITION_CHECK_COUNT = 3   # 진입 중인 다른 티커 김프 확인 개수

@@ -10,6 +10,8 @@ import logging
 import os
 import time
 import hmac
+
+import util
 from consts import *
 from datetime import datetime, timezone, timedelta
 
@@ -214,6 +216,7 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
     while True:
         try:
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
+
             async with (websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
                                           ping_timeout=SOCKET_PING_TIMEOUT, max_queue=10000) as websocket):
                 socket_connect[exchange] = 1
@@ -280,7 +283,11 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
                                 orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_price'] = float(data['b'][i][0]) * TETHER
                                 orderbook_info[ticker][exchange]["orderbook_units"][j]['bid_size'] = data['b'][i][1]
                                 j += 1
-
+                        '''
+                        if util.is_need_reset_socket(start_time):
+                            logging.info(f'{exchange} Websocket 연결 24시간 초과, 재연결 수행')
+                            break
+                        '''
                     except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                         try:
                             socket_connect[exchange] = 0
@@ -289,12 +296,10 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
                             await asyncio.wait_for(pong, timeout=SOCKET_PING_TIMEOUT)
                             socket_connect[exchange] = 1
                         except:
-                            socket_connect[exchange] = 0
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
-                            socket_connect[exchange] = 1
-                socket_connect[exchange] = 0
-                logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect[1]}")
+                            break
+                logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect}")
                 await websocket.close()
         except socket.gaierror:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")

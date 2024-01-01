@@ -2,13 +2,13 @@ import os
 import datetime
 import graphUtil
 
-def get_measure_ticker():
+def get_measure_ticker(date):
     check_data = {}
     trade_data = {}
     position_data = {}
     measure_ticker = {}
 
-    lines = graphUtil.load_history_data()
+    lines = graphUtil.load_history_data(date)
     btc_open_gap = 0
 
     for line in lines:
@@ -58,7 +58,7 @@ def get_measure_ticker():
         if ticker == 'BTC' or ticker == 'ETH' or ticker == 'ETH':
             continue
 
-        if len(measure_ticker) > 12:
+        if len(measure_ticker) > 4:
             continue
 
         if close_diff_gap > 1.3:

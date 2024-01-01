@@ -33,21 +33,15 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
 
             if position_data[ticker]['position'] == 1:
                 ## 진입 중일 떄
-                now = datetime.now()
-                three_days_ago = now - timedelta(days=3)
-                two_days_ago = now - timedelta(days=3)
-                one_days_ago = now - timedelta(days=3)
-
-                open_timestamp = position_data[ticker]['open_timestamp']
-                ## 너무 예전 포지션일 경우 탈출 갭 낮춤
-                if open_timestamp < three_days_ago.timestamp():
-                    close_gimp_gap = CLOSE_GIMP_GAP - 0.3
-                elif open_timestamp< two_days_ago.timestamp():
-                    close_gimp_gap = CLOSE_GIMP_GAP - 0.2
-                elif open_timestamp < one_days_ago.timestamp():
+                if position_data[ticker]['close_install_count'] == 0:
+                    close_gimp_gap = CLOSE_GIMP_GAP - 0.15
+                elif position_data[ticker]['close_install_count'] == 1:
                     close_gimp_gap = CLOSE_GIMP_GAP - 0.1
+                elif position_data[ticker]['close_install_count'] == 2:
+                    close_gimp_gap = CLOSE_GIMP_GAP - 0.05
                 else:
                     close_gimp_gap = CLOSE_GIMP_GAP
+
                 ## 진입 종료 조건 확인
                 if close_gimp - position_data[ticker]['position_gimp'] > close_gimp_gap:
                     order_lock = asyncio.Lock()
@@ -55,6 +49,10 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                     order_result = {
                         'uuid': 0, 'orderId': 0, 'upbit_price': 0, 'upbit_quantity': 0, 'binance_price': 0, 'binance_quantity': 0
                     }
+
+                    position_data[ticker]['close_limit_count'] += 1
+                    if position_data[ticker]['close_limit_count'] < 3:
+                        continue
 
                     ## 익절 분할 횟수 Count 도달하지 않을 시
                     if (position_data[ticker]['close_install_count'] + 1) * CLOSE_INSTALLMENT < 1:
@@ -92,8 +90,10 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             order_result['binance_price'] = order_result['binance_price'] * TETHER
                             order_close_gimp = round(order_result['upbit_price'] / order_result['binance_price'] * 100 - 100, 3)
 
+                            position_data[ticker]['close_limit_count'] = 0
                             position_data[ticker]['close_install_count'] += 1
                             position_data[ticker]['front_close_gimp'] = order_close_gimp
+                            position_data[ticker]['front_position_gimp'] = position_data[ticker]['position_gimp']
 
                             trade_data[ticker]['close_bid_price_acc'] += order_result['upbit_price'] * order_result['upbit_quantity']
                             trade_data[ticker]['close_ask_price_acc'] += order_result['binance_price'] * order_result['binance_quantity']
@@ -143,6 +143,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             order_result['binance_price'] = order_result['binance_price'] * TETHER
                             order_close_gimp = round(order_result['upbit_price'] / order_result['binance_price'] * 100 - 100, 2)
 
+                            position_data[ticker]['close_limit_count'] = 0
                             position_data[ticker]['close_install_count'] += 1
                             position_ticker_count['count'] -= 1
                             position_data[ticker]['front_close_gimp'] = order_close_gimp
