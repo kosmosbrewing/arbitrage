@@ -3,7 +3,7 @@ import util
 import traceback
 import logging
 from consts import *
-from compareprice import comparePriceOpenOrder, comparePriceOpenCheck, comparePriceCloseOrder
+from compareprice import comparePriceOpenOrder, comparePriceCheck, comparePriceCloseOrder
 from api import upbit, binance, checkOrderbook, checkRealGimp
 
 class Premium:
@@ -19,6 +19,7 @@ class Premium:
         self.acc_ticker_data = {}
         self.remain_bid_balance = {"balance": BALANCE}
         self.position_ticker_count = {"count": 0, "open_gimp_limit": 0}
+        self.order_flag = {"open": 0, "close": 0, "ticker": 0}
 
         util.setup_order_logging()
 
@@ -33,7 +34,7 @@ class Premium:
             , asyncio.create_task(self.check_orderbook())
             , asyncio.create_task(self.compare_price_open_order())
             , asyncio.create_task(self.compare_price_close_order())
-            , asyncio.create_task(self.compare_price_open_check())
+            , asyncio.create_task(self.compare_price_check())
             , asyncio.create_task(self.get_profit_position())
         ])
 
@@ -50,13 +51,14 @@ class Premium:
         while문을 통해 일정 주기를 기준으로 무한히 반복 """
         await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
         logging.info(f"Check Real Gimp 기동")
-        util.load_low_gimp(self.exchange_data)
 
         while True:
             try:
+                util.load_low_gimp(self.exchange_data)
+
                 await asyncio.sleep(10)
                 orderbook_info = self.orderbook_info.copy()
-                await checkRealGimp.check_real_gimp(orderbook_info, self.exchange_data)
+                await checkRealGimp.check_real_gimp(orderbook_info, self.exchange_data, self.acc_ticker_count)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -88,7 +90,7 @@ class Premium:
                 else:
                     await comparePriceOpenOrder.compare_price_open_order(orderbook_check, exchange_data,
                                                                          self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
-                                                                         self.acc_ticker_count, self.acc_ticker_data, self.position_ticker_count)
+                                                                         self.acc_ticker_count, self.position_ticker_count, self.order_flag)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -108,16 +110,17 @@ class Premium:
                 else:
                     await comparePriceCloseOrder.compare_price_close_order(orderbook_check, exchange_data,
                                                                            self.remain_bid_balance, self.check_data, self.trade_data, self.position_data,
-                                                                           self.position_ticker_count)
+                                                                           self.position_ticker_count, self.order_flag)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-    async def compare_price_open_check(self):
+    async def compare_price_check(self):
         await asyncio.sleep(COMPARE_PRICE_CHECK_DELAY)
         logging.info(f"ComparePrice Open Check 기동")
 
         util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
         util.load_profit_count(self.position_data)
+        util.put_order_flag(self.order_flag)
 
         for ticker in self.position_data:
             if self.position_data[ticker]['position'] == 1:
@@ -132,18 +135,19 @@ class Premium:
                 socket_connect = self.socket_connect.copy()
 
                 if socket_connect['Upbit'] == 0 or socket_connect['Binance'] == 0:
-                    message = f"Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_check {SOCKET_RETRY_TIME}초 후 재시도"
+                    message = f"🌚 Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_check {SOCKET_RETRY_TIME}초 후 재시도"
                     logging.info(message)
                     await util.send_to_telegram(message)
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
-                    await comparePriceOpenCheck.compare_price_open_check(orderbook_check, self.check_data, self.trade_data,
+                    await comparePriceCheck.compare_price_check(orderbook_check, self.check_data, self.trade_data,
                                                                          self.position_data, self.acc_ticker_count, self.acc_ticker_data,
-                                                                         self.position_ticker_count)
+                                                                         self.position_ticker_count, self.exchange_data)
 
                 util.put_remain_position(self.position_data, self.trade_data)
                 util.put_profit_count(self.position_data)
                 util.put_orderbook_check(self.orderbook_check)
+                util.load_order_flag(self.order_flag)
             except Exception as e:
                 logging.info(traceback.format_exc())
 

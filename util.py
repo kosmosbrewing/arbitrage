@@ -1,5 +1,4 @@
 import traceback
-
 import telegram
 import asyncio
 import aiohttp
@@ -9,7 +8,7 @@ import json
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from api import binance
+from api import upbit
 from consts import *
 from datetime import datetime, timezone, timedelta
 bot = None
@@ -67,8 +66,6 @@ def setup_order_logging():
     root_logger = logging.getLogger()
     root_logger.addHandler(file_handler)
 
-
-
 async def get_chat_id():
     logging.info("Telegram Chat ID 요청합니다..")
     async with aiohttp.ClientSession() as session:
@@ -86,7 +83,8 @@ async def get_chat_id():
                 else:
                     logging.info(f"Telegram Chat ID 요청 응답 오류: {response.status}")
         except aiohttp.ClientError as e:
-            logging.info(f"Telegram 세션연결 오류: {e}")
+            logging.info(f"Telegram 세션 연결 오류: {e}")
+
 async def send_to_telegram(message):
     # 텔레그램 메시지 보내는 함수, 최대 3회 연결, 3회 전송 재시도 수행
     global bot
@@ -186,7 +184,6 @@ def load_remain_position(position_data, trade_data, position_ticker_count):
                 
     else:
         logging.info(f"{load_path} There is no file")
-        
 
 def put_remain_position(position_data, trade_data):
     put_path = ''
@@ -316,7 +313,6 @@ def load_profit_count(position_data):
                 logging.info(e)
     else:
         logging.info(f"{load_path} There is no file")
-        
 
 def put_profit_count(position_data):
     put_path = ''
@@ -334,27 +330,58 @@ def put_profit_count(position_data):
     with open(put_path, 'w') as file:
         file.write(put_data)
 
-def load_low_gimp(exchange_data):
+def load_order_flag(order_flag):
     if ENV == 'real':
-        low_gimp_path = '/root/arbitrage/data/low_gimp.DAT'
+        load_path = '/root/arbitrage/data/order_flag.json'
     elif ENV == 'local':
-        low_gimp_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/low_gimp.DAT'
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/order_flag.json'
 
-    if os.path.exists(low_gimp_path):
-        with open(low_gimp_path, 'r', encoding='utf-8') as file:
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
 
         for line in lines:
             try:
-                low_gimp = float(line)
+                order_flag.update(json.loads(line))
+            except Exception as e:
+                logging.info(e)
+    else:
+        print(f"There is no File {load_path}")
+        logging.info(f"{load_path} There is no file")
+
+def put_order_flag(order_flag):
+    put_path = ''
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/data/order_flag.json'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/order_flag.json'
+
+    put_data = json.dumps(order_flag)
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
+def load_low_gimp(exchange_data):
+    if ENV == 'real':
+        load_path = '/root/arbitrage/data/low_gimp.DAT'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/low_gimp.DAT'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                data = line.split('|')
+                low_gimp = float(data[0])
                 exchange_data['low_gimp'] = low_gimp
-                logging.info(f"LOW_GIMP|{exchange_data['low_gimp']}")
             except Exception as e:
                 logging.info(e)
 
     else:
-        print(f"There is no File {low_gimp_path}")
-        logging.info(f"{low_gimp_path} There is no file")
+        print(f"There is no File {load_path}")
+        logging.info(f"{load_path} There is no file")
 
 def put_low_gimp(exchange_data):
     put_path = ''
@@ -380,7 +407,6 @@ def load_history_data():
         history_file_path = '/root/arbitrage/log/premium_data_'+yesterday
     elif ENV == 'local':
         history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_'+yesterday
-        #history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data_20231107'
         history_file_path = 'C:/Users/skdba/PycharmProjects/arbitrage/log/premium_data'
 
     if os.path.exists(history_file_path):
@@ -395,10 +421,58 @@ def load_history_data():
 def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_balance):
     # 오늘 날짜 가져오기
     try:
+        usd_price = upbit.get_usd_price()
         btc_open_gimp = 0
         open_timestamp = []
         open_message = {}
         message = ''
+
+        open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
+        open_bid_eth = float(orderbook_check['ETH']['Upbit']['balance_ask_average'])
+        open_bid_xrp = float(orderbook_check['XRP']['Upbit']['balance_ask_average'])
+
+        open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average'])
+        open_ask_eth = float(orderbook_check['XRP']['Binance']['balance_bid_average'])
+        open_ask_xrp = float(orderbook_check['ETH']['Binance']['balance_bid_average'])
+
+        real_open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
+        real_open_bid_eth = float(orderbook_check['ETH']['Upbit']['balance_ask_average'])
+        real_open_bid_xrp = float(orderbook_check['XRP']['Upbit']['balance_ask_average'])
+
+        real_open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average']) / TETHER * usd_price
+        real_open_ask_eth = float(orderbook_check['XRP']['Binance']['balance_bid_average']) / TETHER * usd_price
+        real_open_ask_xrp = float(orderbook_check['ETH']['Binance']['balance_bid_average']) / TETHER * usd_price
+
+        if real_open_bid_btc == 0 or real_open_ask_btc == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+        if real_open_bid_eth == 0 or real_open_ask_eth == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+        if real_open_bid_xrp == 0 or real_open_ask_xrp == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+        if open_bid_btc == 0 or open_ask_btc == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+        if open_bid_eth == 0 or open_ask_eth == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+        if open_bid_xrp == 0 or open_ask_xrp == 0:
+            message = f"🌚 1분 후 재시도..."
+            return message
+
+        fix_open_bid = open_bid_btc + open_bid_eth + open_bid_xrp
+        fix_open_ask = open_ask_btc + open_ask_eth + open_ask_xrp
+
+        real_open_bid = real_open_bid_btc + real_open_bid_eth + real_open_bid_xrp
+        real_open_ask = real_open_ask_btc + real_open_ask_eth + real_open_ask_xrp
+        fix_open_gimp = round(fix_open_bid / fix_open_ask * 100 - 100, 2)
+        real_open_gimp = round(real_open_bid / real_open_ask * 100 - 100, 2)
+
+        message = f"🤡고정실제김프: {fix_open_gimp}%|{real_open_gimp}%\n"
+        #message += f"🤡BTC 김프: {btc_open_gimp}%|실제 김프: {real_open_gimp}%\n"
+
         for ticker in position_data:
             if position_data[ticker]['position'] == 1:
                 time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
@@ -406,25 +480,24 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
 
                 close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
                 close_ask = float(orderbook_check[ticker]['Binance']['balance_ask_average'])
-                open_bid_btc = float(orderbook_check['BTC']['Upbit']['balance_ask_average'])
-                open_ask_btc = float(orderbook_check['BTC']['Binance']['balance_bid_average'])
 
                 if close_bid == 0 or close_ask == 0:
-                    continue
-                if open_bid_btc == 0 or open_ask_btc == 0:
-                    continue
-
-                close_gimp = round(close_bid / close_ask * 100 - 100, 2)
-                btc_open_gimp = round(open_bid_btc / open_ask_btc * 100 - 100, 2)
-
-                open_timestamp.append(time_object_korea)
-                open_message[time_object_korea] = (
-                    f"🌝{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
-                    f"|{position_data[ticker]['position_gimp']}~{close_gimp}%"
-                    f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
-                    f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
-                )
-
+                    open_timestamp.append(time_object_korea)
+                    open_message[time_object_korea] = (
+                        f"🌚{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
+                        f"|{position_data[ticker]['position_gimp']}|조회오류"
+                        f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
+                        f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                    )
+                else:
+                    close_gimp = round(close_bid / close_ask * 100 - 100, 2)
+                    open_timestamp.append(time_object_korea)
+                    open_message[time_object_korea] = (
+                        f"🌝{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
+                        f"|{position_data[ticker]['position_gimp']}|{close_gimp}%"
+                        f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
+                        f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                    )
         for i in range(len(open_timestamp)):
             timestamp = min(open_timestamp)
             temp_message = str(open_message[timestamp])
@@ -432,7 +505,7 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
             open_timestamp.remove(timestamp)
 
         if remain_bid_balance['balance'] < BALANCE:
-            message += f"💰잔액: {round(remain_bid_balance['balance'], 0):,}원|BTC김프: {btc_open_gimp}%"
+            message += f"💰잔액: {round(remain_bid_balance['balance'], 0):,}원"
 
         if len(message) == 0:
             message = f"🌚 진입 정보 없음"

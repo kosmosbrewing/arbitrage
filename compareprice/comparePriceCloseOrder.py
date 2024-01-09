@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from api import upbit, binance
 
 async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_balance, check_data, trade_data,
-                                position_data, position_ticker_count):
+                                position_data, position_ticker_count, order_flag):
     close_message_list = []
 
     """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
@@ -43,7 +43,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                     close_gimp_gap = CLOSE_GIMP_GAP
 
                 ## 진입 종료 조건 확인
-                if close_gimp - position_data[ticker]['position_gimp'] > close_gimp_gap:
+                if close_gimp - position_data[ticker]['position_gimp'] > close_gimp_gap or (order_flag['close'] == 1 and ticker == order_flag['ticker']):
                     order_lock = asyncio.Lock()
                     check_order_lock = asyncio.Lock()
                     order_result = {
@@ -54,10 +54,15 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                     if position_data[ticker]['close_limit_count'] < 3:
                         continue
 
+                    if close_gimp - position_data[ticker]['position_gimp'] > CLOSE_GIMP_GAP:
+                        close_installment = CLOSE_INSTALLMENT + 1
+                    else:
+                        close_installment = CLOSE_INSTALLMENT
+
                     ## 익절 분할 횟수 Count 도달하지 않을 시
-                    if (position_data[ticker]['close_install_count'] + 1) * CLOSE_INSTALLMENT < 1:
-                        upbit_quantity = round(trade_data[ticker]['upbit_total_quantity'] * CLOSE_INSTALLMENT, exchange_data[ticker]['quantity_precision'])
-                        binance_quantity = round(trade_data[ticker]['binance_total_quantity'] * CLOSE_INSTALLMENT, exchange_data[ticker]['quantity_precision'])
+                    if (position_data[ticker]['close_install_count'] + 1) * close_installment < 1:
+                        upbit_quantity = round(trade_data[ticker]['upbit_total_quantity'] * close_installment, exchange_data[ticker]['quantity_precision'])
+                        binance_quantity = round(trade_data[ticker]['binance_total_quantity'] * close_installment, exchange_data[ticker]['quantity_precision'])
 
                         if close_ask * binance_quantity < TETHER * exchange_data[ticker]['min_notional']:
                             position_data[ticker]['close_install_count'] += 1
@@ -93,7 +98,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             position_data[ticker]['close_limit_count'] = 0
                             position_data[ticker]['close_install_count'] += 1
                             position_data[ticker]['front_close_gimp'] = order_close_gimp
-                            position_data[ticker]['front_position_gimp'] = position_data[ticker]['position_gimp']
+                            #position_data[ticker]['front_position_gimp'] = position_data[ticker]['position_gimp'] + INSTALL_WEIGHT
 
                             trade_data[ticker]['close_bid_price_acc'] += order_result['upbit_price'] * order_result['upbit_quantity']
                             trade_data[ticker]['close_ask_price_acc'] += order_result['binance_price'] * order_result['binance_quantity']
@@ -102,16 +107,16 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
 
                             ## 메세지 저장
                             message = (f"{ticker} 분할 종료\n"
-                                       f"진입종료김프: {position_data[ticker]['position_gimp']}%-{order_close_gimp}%({round(order_close_gimp - position_data[ticker]['position_gimp'], 3)}%)\n"
-                                       f"분할매수매도: {position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']}\n"
-                                       f"요청주문김프: {round(close_gimp,3)}%/{round(order_close_gimp,3)}%\n"
-                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%/{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%\n"
+                                       f"진입종료김프: {position_data[ticker]['position_gimp']}%|{order_close_gimp}%({round(order_close_gimp - position_data[ticker]['position_gimp'], 3)}%)\n"
+                                       f"분할매수매도: {position_data[ticker]['open_install_count']}|{position_data[ticker]['close_install_count']}\n"
+                                       f"요청주문김프: {round(close_gimp,3)}%|{round(order_close_gimp,3)}%\n"
+                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%|{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%\n"
                                        f"잔액: {round(remain_bid_balance['balance'], 2):,}원\n"
                                        f"고정환율: {TETHER:,}원\n")
                             close_message_list.append(message)
 
                     ## 익절 분할 횟수 Count 도달할 시 계산 로직 변경
-                    elif (position_data[ticker]['close_install_count'] + 1) * CLOSE_INSTALLMENT >= 1:
+                    elif (position_data[ticker]['close_install_count'] + 1) * close_installment >= 1:
                         ## 마지막 남은 개수 한 번에 종료
                         upbit_quantity = trade_data[ticker]['upbit_total_quantity'] - trade_data[ticker]['upbit_close_quantity']
                         binance_quantity = round(trade_data[ticker]['binance_total_quantity'] - trade_data[ticker]['binance_close_quantity'], exchange_data[ticker]['quantity_precision'])
@@ -166,21 +171,23 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
 
                             ## 메세지 저장
                             message = (f"{ticker} 종료\n"                                   
-                                       f"진입종료김프:{position_data[ticker]['position_gimp']}%-{order_close_gimp}%({round(order_close_gimp - position_data[ticker]['position_gimp'], 3)}%)\n"
+                                       f"진입종료김프:{position_data[ticker]['position_gimp']}%|{order_close_gimp}%({round(order_close_gimp - position_data[ticker]['position_gimp'], 3)}%)\n"
                                        f"거래손익: UPBIT({round(upbit_profit,2):,}원) + BINANCE({round(binance_profit,2):,}원) = {trade_data[ticker]['trade_profit']:,}원\n"
                                        f"수익률: {round(trade_data[ticker]['trade_profit']/(BALANCE * 2) * 100, 3)}%\n"
-                                       f"분할매수매도: {position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']}\n"
-                                       f"요청주문김프: {round(close_gimp,3)}%/{round(order_close_gimp,3)}%\n"
-                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%/{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%\n"
-                                       f"요청가격: {close_bid:,}원/{close_ask:,}원\n"
-                                       f"주문가격: {round(order_result['upbit_price'],2):,}원/{round(order_result['binance_price'],2):,}원\n"
-                                       f"진입누적가격: {round(trade_data[ticker]['open_bid_price_acc'],2):,}원/{round(trade_data[ticker]['open_ask_price_acc'],2):,}원\n"
-                                       f"종료누적가격: {round(trade_data[ticker]['close_bid_price_acc'],2):,}원/{round(trade_data[ticker]['close_ask_price_acc'],2):,}원\n"
-                                       f"종료수량: {order_result['upbit_quantity']}/{order_result['binance_quantity']}\n"
-                                       f"총진입수량: {trade_data[ticker]['upbit_total_quantity']}/{trade_data[ticker]['binance_total_quantity']}\n"
+                                       f"분할매수매도: {position_data[ticker]['open_install_count']}|{position_data[ticker]['close_install_count']}\n"
+                                       f"요청주문김프: {round(close_gimp,3)}%|{round(order_close_gimp,3)}%\n"
+                                       f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%|{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%\n"
+                                       f"요청가격: {round(close_bid,2):,}원/{round(close_ask,2):,}원\n"
+                                       f"주문가격: {round(order_result['upbit_price'],2):,}원|{round(order_result['binance_price'],2):,}원\n"
+                                       f"진입누적가격: {round(trade_data[ticker]['open_bid_price_acc'],2):,}원|{round(trade_data[ticker]['open_ask_price_acc'],2):,}원\n"
+                                       f"종료누적가격: {round(trade_data[ticker]['close_bid_price_acc'],2):,}원|{round(trade_data[ticker]['close_ask_price_acc'],2):,}원\n"
+                                       f"종료수량: {order_result['upbit_quantity']}|{order_result['binance_quantity']}\n"
+                                       f"총진입수량: {trade_data[ticker]['upbit_total_quantity']}|{trade_data[ticker]['binance_total_quantity']}\n"
                                        f"잔액: {round(remain_bid_balance['balance'], 2):,}원\n"
                                        f"고정환율: {TETHER:,}원")
                             close_message_list.append(message)
+                            order_flag = {"open": 0, "close": 0, "ticker": 0}
+                            util.put_order_flag(order_flag)
                             util.put_profit_data(ticker, position_data[ticker]['position_gimp'], order_close_gimp, trade_data[ticker]['trade_profit'], BALANCE)
 
                             # 현재 시점으로 데이터 갱신
@@ -193,7 +200,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             position_data[ticker].update({
                                 "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                                 "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                                "open_timestamp": 0, "open_install_check": 0
+                                "open_timestamp": 0, "open_install_check": 0, "front_position_gimp": 0, "close_limit_count": 0
                             })
                             ## profit_count, total_profit 제외하고 값 갱신
                             trade_data[ticker].update({
@@ -206,12 +213,12 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             logging.info(f'종료 데이터 초기화 (check, position, trade)')
         except Exception as e:
             logging.info(f"CloseOrder 오류: {traceback.format_exc()}")
-
+            '''
             position_data[ticker] = {
                 "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                 "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
                 "profit_count": 0, "front_close_gimp": 0, "open_timestamp": 0, "open_limit_count": 0,
-                "open_install_check": 0
+                "open_install_check": 0, "front_position_gimp": 0, "close_limit_count": 0
             }
 
             trade_data[ticker] = {
@@ -220,7 +227,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                 "upbit_total_quantity": 0, "upbit_close_quantity": 0,
                 "binance_total_quantity": 0, "binance_close_quantity": 0,
                 "trade_profit": 0, "total_profit": 0
-            }
+            }'''
 
     for message in close_message_list:
         logging.info(f"POSITION_CLOSE|{message}")
