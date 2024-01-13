@@ -10,7 +10,6 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
     compare_exchange = BINANCE
     position_gimp_list = []
     position_ticker_list = []
-    #front_position_gimp_list = []
 
     for ticker in orderbook_check:
         try:
@@ -35,11 +34,11 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                     'data': deque(maxlen=FRONT_OPEN_COUNT),
                     'open_count': 0
                 }
-            if ticker not in acc_ticker_data:
-                acc_ticker_data[ticker] = {
-                    'data': deque(maxlen=FRONT_AVERAGE_COUNT),
-                    'fall_check': 0
-                }
+            ## 포지션 진입 중인 데이터 확인
+            if position_data[ticker]['position'] == 1:
+                position_data[ticker]['open_install_check'] = 0
+                position_gimp_list.append(position_data[ticker]['position_gimp'])
+                position_ticker_list.append(ticker)
 
             if orderbook_check[ticker]['Binance'] is None or orderbook_check[ticker]['Upbit'] is None:
                 continue
@@ -64,8 +63,15 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
                 }
 
+            if open_gimp < check_data[ticker]['open_gimp']:
+                # open_gimp 이 Update 되면 close_gimp은 그 시점으로 gap 수정
+                check_data[ticker] = {
+                    "open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
+                    "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
+                }
+
             ## 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
-            if close_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
+            if open_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
                 check_data[ticker] = {
                     "open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
@@ -76,30 +82,10 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
             else:
                 acc_ticker_count[ticker]['data'].append(0)
                 acc_ticker_count[ticker]['open_count'] = sum(acc_ticker_count[ticker]['data'])
-
-            if position_data[ticker]['position'] == 1:
-                position_data[ticker]['open_install_check'] = 0
-                position_gimp_list.append(position_data[ticker]['position_gimp'])
-                position_ticker_list.append(ticker)
-                #front_position_gimp_list.append(position_data[ticker]['front_position_gimp'])
-
-            '''
-            acc_ticker_data[ticker]['data'].append(open_gimp)
-            acc_ticker_data_len = len(acc_ticker_data[ticker]['data'])
-            
-            if acc_ticker_data_len > 30:
-                acc_ticker_data[ticker]['fall_check'] = 1
-                for i in range(3):
-                    if acc_ticker_data[ticker]['data'][round(i * acc_ticker_data_len / 3)] < acc_ticker_data[ticker]['data'][round((i+1) * acc_ticker_data_len / 3) - 1]:
-                        acc_ticker_data[ticker]['fall_check'] = 0
-            '''
-
         except Exception as e:
             logging.info(f"OpenCheck 오류: {traceback.format_exc()}")
-            continue
 
     try:
-        #if len(front_position_gimp_list) > 0:
         if len(position_gimp_list) > 0:
             min_position_gimp = min(position_gimp_list)
 
@@ -109,15 +95,15 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
             min_ticker = position_ticker_list[ticker_index]
             position_data[min_ticker]['open_install_check'] = 1
 
-            if exchange_data['avg_gimp'] < 1.5:
+            if exchange_data['avg_gimp'] < 1.8:
+                install_weight = 0.2
+            elif 1.8 <= exchange_data['avg_gimp'] < 2.8:
+                install_weight = 0.3
+            elif 2.8 <= exchange_data['avg_gimp'] < 3.8:
                 install_weight = 0.4
-            elif 1.5 <= exchange_data['avg_gimp'] < 2.5:
+            elif exchange_data['avg_gimp'] > 3.8:
                 install_weight = 0.5
-            elif 2.5 <= exchange_data['avg_gimp'] < 3.5:
-                install_weight = 0.6
-            elif exchange_data['avg_gimp'] > 3.5:
-                install_weight = 0.7
 
-            position_ticker_count['open_gimp_limit'] = position_data[min_ticker]['front_position_gimp'] - install_weight
+            position_ticker_count['open_gimp_limit'] = min_position_gimp - install_weight
     except Exception as e:
         logging.info(f"OpenCheck 오류: {traceback.format_exc()}")

@@ -42,14 +42,13 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                 else:
                     close_gimp_gap = CLOSE_GIMP_GAP
 
+                if 2.8 <= exchange_data['avg_gimp'] <= 3.8:
+                    close_gimp_gap = CLOSE_GIMP_GAP - 0.1
+                elif exchange_data['avg_gimp'] > 3.8:
+                    close_gimp_gap = CLOSE_GIMP_GAP - 0.15
+
                 ## 진입 종료 조건 확인
                 if close_gimp - position_data[ticker]['position_gimp'] > close_gimp_gap or (order_flag['close'] == 1 and ticker == order_flag['ticker']):
-                    order_lock = asyncio.Lock()
-                    check_order_lock = asyncio.Lock()
-                    order_result = {
-                        'uuid': 0, 'orderId': 0, 'upbit_price': 0, 'upbit_quantity': 0, 'binance_price': 0, 'binance_quantity': 0
-                    }
-
                     position_data[ticker]['close_limit_count'] += 1
                     if position_data[ticker]['close_limit_count'] < 3:
                         continue
@@ -58,6 +57,9 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         close_installment = CLOSE_INSTALLMENT + 1
                     else:
                         close_installment = CLOSE_INSTALLMENT
+
+                    order_lock = asyncio.Lock()
+                    order_result = {}
 
                     ## 익절 분할 횟수 Count 도달하지 않을 시
                     if (position_data[ticker]['close_install_count'] + 1) * close_installment < 1:
@@ -69,11 +71,9 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             logging.info(f"SKIP|{ticker}|주문금액적음|{open_ask * binance_quantity:,}원|MIN_NOTIONAL|{TETHER * exchange_data[ticker]['min_notional']:,}원")
                             continue
 
-                        ## UPBIT : ticker, side, price, quantity, order_result, lock
-                        ## BINANCE : ticker, side, quantity, order_result, lock
                         await asyncio.gather(
-                            upbit.spot_order('KRW-' + ticker, 'ask', 0, upbit_quantity, order_result, order_lock),
-                            binance.futures_order(ticker + 'USDT', 'bid', binance_quantity, order_result, order_lock)
+                            binance.futures_order(ticker + 'USDT', 'bid', binance_quantity, order_result, order_lock),
+                            upbit.spot_order('KRW-' + ticker, 'ask', 0, upbit_quantity, order_result, order_lock)
                         )
 
                         if order_result['uuid'] == 0 or order_result['orderId'] == 0:
@@ -82,6 +82,8 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             message += 'BINANCE 주문❌' if order_result['orderId'] == 0 else 'BINANCE 주문✅'
                             await util.send_to_telegram(message)
                             continue
+
+                        check_order_lock = asyncio.Lock()
 
                         async with order_lock:
                             await asyncio.gather(
@@ -98,7 +100,6 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             position_data[ticker]['close_limit_count'] = 0
                             position_data[ticker]['close_install_count'] += 1
                             position_data[ticker]['front_close_gimp'] = order_close_gimp
-                            #position_data[ticker]['front_position_gimp'] = position_data[ticker]['position_gimp'] + INSTALL_WEIGHT
 
                             trade_data[ticker]['close_bid_price_acc'] += order_result['upbit_price'] * order_result['upbit_quantity']
                             trade_data[ticker]['close_ask_price_acc'] += order_result['binance_price'] * order_result['binance_quantity']
@@ -124,8 +125,8 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         ## UPBIT : ticker, side, price, quantity, order_result, lock
                         ## BINANCE : ticker, side, quantity, order_result, lock
                         await asyncio.gather(
-                            upbit.spot_order('KRW-'+ticker, 'ask', 0, upbit_quantity, order_result, order_lock),
-                            binance.futures_order(ticker+'USDT', 'bid', binance_quantity, order_result, order_lock)
+                            binance.futures_order(ticker + 'USDT', 'bid', binance_quantity, order_result, order_lock),
+                            upbit.spot_order('KRW-'+ticker, 'ask', 0, upbit_quantity, order_result, order_lock)
                         )
                         ## 주문 제대로 안들어갈 시
                         if order_result['uuid'] == 0 or order_result['orderId'] == 0:
@@ -134,6 +135,8 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             message += 'BINANCE 주문❌' if order_result['orderId'] == 0 else 'BINANCE 주문✅'
                             await util.send_to_telegram(message)
                             continue
+
+                        check_order_lock = asyncio.Lock()
 
                         ## 주문 확인
                         async with order_lock:
@@ -177,7 +180,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                                        f"분할매수매도: {position_data[ticker]['open_install_count']}|{position_data[ticker]['close_install_count']}\n"
                                        f"요청주문김프: {round(close_gimp,3)}%|{round(order_close_gimp,3)}%\n"
                                        f"슬리피지: {round(order_result['upbit_price'] / close_bid * 100 - 100, 3)}%|{round(order_result['binance_price'] / close_ask * 100 - 100, 3)}%\n"
-                                       f"요청가격: {round(close_bid,2):,}원/{round(close_ask,2):,}원\n"
+                                       f"요청가격: {round(close_bid,2):,}원|{round(close_ask,2):,}원\n"
                                        f"주문가격: {round(order_result['upbit_price'],2):,}원|{round(order_result['binance_price'],2):,}원\n"
                                        f"진입누적가격: {round(trade_data[ticker]['open_bid_price_acc'],2):,}원|{round(trade_data[ticker]['open_ask_price_acc'],2):,}원\n"
                                        f"종료누적가격: {round(trade_data[ticker]['close_bid_price_acc'],2):,}원|{round(trade_data[ticker]['close_ask_price_acc'],2):,}원\n"
@@ -213,21 +216,6 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                             logging.info(f'종료 데이터 초기화 (check, position, trade)')
         except Exception as e:
             logging.info(f"CloseOrder 오류: {traceback.format_exc()}")
-            '''
-            position_data[ticker] = {
-                "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
-                "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                "profit_count": 0, "front_close_gimp": 0, "open_timestamp": 0, "open_limit_count": 0,
-                "open_install_check": 0, "front_position_gimp": 0, "close_limit_count": 0
-            }
-
-            trade_data[ticker] = {
-                "open_bid_price_acc": 0, "open_ask_price_acc": 0,
-                "close_bid_price_acc": 0, "close_ask_price_acc": 0,
-                "upbit_total_quantity": 0, "upbit_close_quantity": 0,
-                "binance_total_quantity": 0, "binance_close_quantity": 0,
-                "trade_profit": 0, "total_profit": 0
-            }'''
 
     for message in close_message_list:
         logging.info(f"POSITION_CLOSE|{message}")

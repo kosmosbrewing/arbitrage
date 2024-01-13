@@ -471,12 +471,17 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
         real_open_gimp = round(real_open_bid / real_open_ask * 100 - 100, 2)
 
         message = f"🤡고정실제김프: {fix_open_gimp}%|{real_open_gimp}%\n"
-        #message += f"🤡BTC 김프: {btc_open_gimp}%|실제 김프: {real_open_gimp}%\n"
 
+        position_gimp_list = []
+        position_ticker_list = []
         for ticker in position_data:
             if position_data[ticker]['position'] == 1:
                 time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
                 time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
+
+                position_data[ticker]['open_install_check'] = 0
+                position_gimp_list.append(position_data[ticker]['position_gimp'])
+                position_ticker_list.append(ticker)
 
                 close_bid = float(orderbook_check[ticker]['Upbit']['balance_bid_average'])
                 close_ask = float(orderbook_check[ticker]['Binance']['balance_ask_average'])
@@ -485,7 +490,7 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                     open_timestamp.append(time_object_korea)
                     open_message[time_object_korea] = (
                         f"🌚{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
-                        f"|{position_data[ticker]['position_gimp']}|조회오류"
+                        f"|{position_data[ticker]['position_gimp']}%|조회오류"
                         f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
                         f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
                     )
@@ -494,7 +499,7 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                     open_timestamp.append(time_object_korea)
                     open_message[time_object_korea] = (
                         f"🌝{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
-                        f"|{position_data[ticker]['position_gimp']}|{close_gimp}%"
+                        f"|{position_data[ticker]['position_gimp']}%|{close_gimp}%"
                         f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
                         f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
                     )
@@ -503,6 +508,26 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
             temp_message = str(open_message[timestamp])
             message += temp_message
             open_timestamp.remove(timestamp)
+
+        if len(position_gimp_list) > 0:
+            min_position_gimp = min(position_gimp_list)
+            ticker_index = position_gimp_list.index(min_position_gimp)
+            min_ticker = position_ticker_list[ticker_index]
+            position_data[min_ticker]['open_install_check'] = 1
+
+            if real_open_gimp < 1.8:
+                install_weight = 0.2
+            elif 1.8 <= real_open_gimp < 2.8:
+                install_weight = 0.3
+            elif 2.8 <= real_open_gimp < 3.8:
+                install_weight = 0.4
+            elif real_open_gimp > 3.8:
+                install_weight = 0.5
+
+            open_gimp_limit = min_position_gimp - install_weight
+
+            message += f"🙆🏻진입현황({len(position_gimp_list)}/{POSITION_MAX_COUNT})|{min_position_gimp}%\n"
+            message += f"🌊물타기|{min_ticker}|{position_data[min_ticker]['open_install_check']}|{round(open_gimp_limit,2)}%\n"
 
         if remain_bid_balance['balance'] < BALANCE:
             message += f"💰잔액: {round(remain_bid_balance['balance'], 0):,}원"

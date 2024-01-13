@@ -62,7 +62,7 @@ async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
 
         if exchange_data['avg_gimp'] < exchange_data['low_gimp']:
             logging.info(f"저점 갱신, {round(exchange_data['low_gimp'], 2)}%->{round(exchange_data['avg_gimp'], 2)}%({round(exchange_data['fix_avg_gimp'], 2)}%)")
-            message = f"🌚김프 저점 갱신\n"
+            message = f"🌚 김프 저점 갱신\n"
             message += f"고정실제저점김프: {round(exchange_data['fix_avg_gimp'], 2)}%|{round(exchange_data['avg_gimp'], 2)}%\n"
             message += f"고정실제환율: {TETHER:,}원|{usd_price:,}원"
 
@@ -88,15 +88,16 @@ async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
 
         elif exchange_data['avg_gimp'] > exchange_data['low_gimp'] + GRID_CHECK_GAP + 1:
             logging.info(f"추세 전환, {round(exchange_data['low_gimp'], 2)}%->{round(exchange_data['avg_gimp'], 2)}%({round(exchange_data['fix_avg_gimp'], 2)}%)")
-            message = f"🌚 추세 전환 \n"
+            exchange_data['low_gimp'] = exchange_data['avg_gimp'] - 1
+            exchange_data['fix_low_gimp'] = exchange_data['fix_avg_gimp'] - 1
+            exchange_data['grid_check'] = 0
+
+            message = f"🌚 추세 전환, 신규 저점 설정 \n"
             message += f"고정실제고점김프: {round(exchange_data['fix_avg_gimp'], 2)}%|{round(exchange_data['avg_gimp'], 2)}%\n"
+            message += f"고정실제저점김프: {round(exchange_data['fix_low_gimp'], 2)}%|{round(exchange_data['low_gimp'], 2)}%\n"
             message += f"고정실제환율: {TETHER:,}원|{usd_price:,}원"
 
-            exchange_data['low_gimp'] = exchange_data['avg_gimp']
-            exchange_data['fix_low_gimp'] = exchange_data['fix_avg_gimp']
-            exchange_data['grid_check'] = 0
             util.put_low_gimp(exchange_data)
-
             await util.send_to_telegram(message)
 
 

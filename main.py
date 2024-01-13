@@ -49,14 +49,14 @@ class Premium:
     async def check_real_gimp(self):
         """ 두나무 API를 이용해 달러가격을 조회하는 함수
         while문을 통해 일정 주기를 기준으로 무한히 반복 """
-        await asyncio.sleep(CHECK_ORDERBOOK_START_DELAY)
+        await asyncio.sleep(CHECK_REAL_GIMP_DELAY)
         logging.info(f"Check Real Gimp 기동")
 
         while True:
             try:
                 util.load_low_gimp(self.exchange_data)
 
-                await asyncio.sleep(10)
+                await asyncio.sleep(CHECK_REAL_GIMP)
                 orderbook_info = self.orderbook_info.copy()
                 await checkRealGimp.check_real_gimp(orderbook_info, self.exchange_data, self.acc_ticker_count)
             except Exception as e:
@@ -116,7 +116,7 @@ class Premium:
 
     async def compare_price_check(self):
         await asyncio.sleep(COMPARE_PRICE_CHECK_DELAY)
-        logging.info(f"ComparePrice Open Check 기동")
+        logging.info(f"ComparePrice Check 기동")
 
         util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
         util.load_profit_count(self.position_data)

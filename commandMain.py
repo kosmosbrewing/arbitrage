@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import util
 import traceback
 import logging
+import subprocess
 from consts import *
 from aiogram import Bot, Dispatcher, executor, types
 from graph import graphUtil
@@ -31,6 +32,7 @@ class Premium:
         dp.register_message_handler(self.graph, commands="graph")
         dp.register_message_handler(self.set_grid, commands="set_grid")
         dp.register_message_handler(self.order, commands="order")
+        dp.register_message_handler(self.restart, commands="restart")
         executor.start_polling(dp)
 
     async def current(self, message: types.Message):
@@ -110,6 +112,38 @@ class Premium:
 
                 message = f"🌝 진입 그리드 최저 값 설정 : {exchange_data['low_gimp']}%"
                 await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
+
+            except Exception as e:
+                message = '🌚 오류 발생..'
+                await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
+                logging.info(traceback.format_exc())
+
+    async def restart(self, message: types.Message):
+        command, *args = message.text.split()
+
+        chat_id = message.chat.id
+
+        if chat_id != self.allowed_chat_id:
+            await message.reply("죄송합니다. 이 채팅에 참여할 권한이 없습니다.")
+        else:
+            try:
+                # 실행할 명령어
+                execute_shell = "/root/arbitrage/bin/main_restart.sh"  # 예: 리눅스의 경우 "ls", 윈도우의 경우 "dir"
+
+                # subprocess.Popen을 사용하여 명령어 실행
+                process = subprocess.Popen(execute_shell, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                # 명령어 실행 결과를 가져오기
+                output, error = process.communicate()
+
+                # 에러 출력 (있으면)
+                if error:
+                    message = f"🌚 Main Restart 수행 실패"
+                    await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
+                    logging.info(error.decode("utf-8"))
+                else:
+                    message = f"🌝 Main Restart 수행 성공!"
+                    await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
 
             except Exception as e:
                 message = '🌚 오류 발생..'
@@ -224,13 +258,7 @@ class Premium:
                     show_x_values = [time[0], time[round(time_len / 6)], time[round(time_len * 2 / 6)],
                                      time[round(time_len * 3 / 6)], time[round(time_len * 4 / 6)],
                                      time[round(time_len * 5 / 6)], time[time_len - 1]]
-                    '''
-                    show_x_values = [str(time[0].strftime("%H:%M:%S")), str(time[round(time_len / 6)].strftime("%H:%M:%S")),
-                                    str(time[round(time_len * 2 / 6)].strftime("%H:%M:%S")),
-                                    str(time[round(time_len * 3 / 6)].strftime("%H:%M:%S")),
-                                    str(time[round(time_len * 4 / 6)].strftime("%H:%M:%S")),
-                                    str(time[round(time_len * 5 / 6)].strftime("%H:%M:%S")),
-                                    str(time[time_len - 1].strftime("%H:%M:%S"))]'''
+
                     plt.xticks(show_x_values)
                     for val in show_x_values:
                         plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)
