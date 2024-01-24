@@ -28,6 +28,7 @@ class Premium:
 
         await asyncio.wait([
             asyncio.create_task(self.get_binance_order_data())
+            , asyncio.create_task(self.get_upbit_top_ticker())
             , asyncio.create_task(self.check_real_gimp())
             , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect))
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
@@ -41,8 +42,20 @@ class Premium:
     async def get_binance_order_data(self):
         while True:
             try:
+                logging.info(f"Binance Quantity Precision 요청")
+
                 binance.get_binance_order_data(self.exchange_data)
                 await asyncio.sleep(GET_ORDER_DATA_DELAY)
+            except Exception as e:
+                logging.info(traceback.format_exc())
+
+    async def get_upbit_top_ticker(self):
+        while True:
+            try:
+                logging.info(f"Upbit Top Ticker 요청")
+                await upbit.accum_top_ticker(self.exchange_data)
+                util.put_top_ticker(self.exchange_data)
+                await asyncio.sleep(GET_TOP_TICKER_DELAY)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -79,7 +92,7 @@ class Premium:
         logging.info(f"ComparePrice Open Order 기동")
         while True:
             try:
-                await asyncio.sleep(10)
+                await asyncio.sleep(COMPARE_PRICE_ORDER)
                 orderbook_check = self.orderbook_check.copy()
                 exchange_data = self.exchange_data.copy()
                 socket_connect = self.socket_connect.copy()
@@ -99,7 +112,7 @@ class Premium:
         logging.info(f"ComparePrice Close Order 기동")
         while True:
             try:
-                await asyncio.sleep(10)
+                await asyncio.sleep(COMPARE_PRICE_ORDER)
                 orderbook_check = self.orderbook_check.copy()
                 exchange_data = self.exchange_data.copy()
                 socket_connect = self.socket_connect.copy()
@@ -148,6 +161,7 @@ class Premium:
                 util.put_profit_count(self.position_data)
                 util.put_orderbook_check(self.orderbook_check)
                 util.load_order_flag(self.order_flag)
+                util.load_close_mode(self.exchange_data)
             except Exception as e:
                 logging.info(traceback.format_exc())
 
@@ -158,7 +172,7 @@ class Premium:
         while True:
             try:
                 orderbook_check = self.orderbook_check.copy()
-                message = util.get_profit_position(orderbook_check, self.position_data, self.trade_data, self.remain_bid_balance)
+                message = util.get_profit_position(orderbook_check, self.position_data, self.trade_data, self.remain_bid_balance, self.exchange_data)
 
                 await util.send_to_telegram(message)
 

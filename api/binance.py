@@ -1,4 +1,6 @@
 import hashlib
+import traceback
+
 import aiohttp
 import ujson
 import requests
@@ -43,7 +45,7 @@ def get_binance_order_data(exchange_data):
                 'quantity_precision': s['quantityPrecision'],
                 'min_notional': float(s['filters'][5]['notional'])
             }
-    logging.info(f"Binance Quantity Precision 요청")
+
     
 def get_min_notional(exchange_data):
     """데이터 수신할 SYMBOL 목록"""
@@ -246,6 +248,16 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
                     try:
                         data = await asyncio.wait_for(websocket.recv(), 10)
                         data = ujson.loads(data)
+
+                        timestamp = time.time()
+
+                        if 'T' in data:
+                            time_diff = timestamp - data['T'] / 1000
+
+                            if time_diff > 1:
+                                continue
+                        else:
+                            continue
 
                         ticker = data['s'].replace("USDT", "") if 's' in data else None
 

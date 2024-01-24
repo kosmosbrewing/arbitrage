@@ -31,11 +31,11 @@ def check_orderbook(orderbook_info, orderbook_check):
                 ask_size += float(orderbook['ask_size'])
 
                 ## bid_amount 로직 수정하기
-                if bid_amount > BALANCE and balance_bid_check == 0:
+                if bid_amount > BALANCE * OPEN_INSTALLMENT and balance_bid_check == 0:
                     balance_bid_average = float(bid_amount / bid_size) if bid_size != 0 else 0
                     balance_bid_check += 1
 
-                if ask_amount > BALANCE and balance_ask_check == 0:
+                if ask_amount > BALANCE * OPEN_INSTALLMENT and balance_ask_check == 0:
                     balance_ask_average = float(ask_amount / ask_size) if ask_size != 0 else 0
                     balance_ask_check += 1
 

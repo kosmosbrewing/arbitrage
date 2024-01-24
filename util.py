@@ -330,6 +330,38 @@ def put_profit_count(position_data):
     with open(put_path, 'w') as file:
         file.write(put_data)
 
+def load_top_ticker(exchange_data):
+    if ENV == 'real':
+        load_path = '/root/arbitrage/data/upbit_top_ticker.json'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/upbit_top_ticker.json'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                exchange_data['upbit_top_ticker'] = eval(line)
+            except Exception as e:
+                logging.info(e)
+    else:
+        print(f"There is no File {load_path}")
+        logging.info(f"{load_path} There is no file")
+
+def put_top_ticker(exchange_data):
+    put_path = ''
+    temp_data = {}
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/data/upbit_top_ticker.json'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/upbit_top_ticker.json'
+
+    put_data = json.dumps(exchange_data['upbit_top_ticker'])
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
 def load_order_flag(order_flag):
     if ENV == 'real':
         load_path = '/root/arbitrage/data/order_flag.json'
@@ -395,6 +427,40 @@ def put_low_gimp(exchange_data):
     with open(put_path, 'w') as file:
         file.write(put_data)
 
+def load_close_mode(exchange_data):
+    if ENV == 'real':
+        load_path = '/root/arbitrage/data/close_mode.DAT'
+    elif ENV == 'local':
+        load_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/close_mode.DAT'
+
+    if os.path.exists(load_path):
+        with open(load_path, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+
+        for line in lines:
+            try:
+                data = line.split('|')
+                close_mode = int(data[0])
+                exchange_data['close_mode'] = close_mode
+            except Exception as e:
+                logging.info(e)
+
+    else:
+        print(f"There is no File {load_path}")
+        logging.info(f"{load_path} There is no file")
+
+def put_close_mode(exchange_data):
+    put_path = ''
+
+    if ENV == 'real':
+        put_path = '/root/arbitrage/data/close_mode.DAT'
+    elif ENV == 'local':
+        put_path = 'C:/Users/skdba/PycharmProjects/arbitrage/data/low_gimpclose_mode.DAT'
+
+    put_data = str(exchange_data['close_mode'])
+    with open(put_path, 'w') as file:
+        file.write(put_data)
+
 def load_history_data():
     # 오늘 날짜 가져오기
     now_date = datetime.date.today()
@@ -418,7 +484,7 @@ def load_history_data():
 
     return lines
 
-def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_balance):
+def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_balance, exchange_data):
     # 오늘 날짜 가져오기
     try:
         usd_price = upbit.get_usd_price()
@@ -470,7 +536,7 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
         fix_open_gimp = round(fix_open_bid / fix_open_ask * 100 - 100, 2)
         real_open_gimp = round(real_open_bid / real_open_ask * 100 - 100, 2)
 
-        message = f"🤡고정실제김프: {fix_open_gimp}%|{real_open_gimp}%\n"
+        message = f"🌟고정김프:{fix_open_gimp}%|실제김프:{real_open_gimp}%\n"
 
         position_gimp_list = []
         position_ticker_list = []
@@ -490,18 +556,18 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                     open_timestamp.append(time_object_korea)
                     open_message[time_object_korea] = (
                         f"🌚{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
-                        f"|{position_data[ticker]['position_gimp']}%|조회오류"
-                        f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
-                        f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                        f"|{round(position_data[ticker]['position_gimp'],2)}%|조회오류"
+                        f"|{round(trade_data[ticker]['open_bid_price_acc']) - round(trade_data[ticker]['close_bid_price_acc']):,}원"
+                        f"|{time_object_korea.strftime('%d일 %H:%M')}\n"
                     )
                 else:
                     close_gimp = round(close_bid / close_ask * 100 - 100, 2)
                     open_timestamp.append(time_object_korea)
                     open_message[time_object_korea] = (
                         f"🌝{ticker}({position_data[ticker]['open_install_count']}/{position_data[ticker]['close_install_count']})"
-                        f"|{position_data[ticker]['position_gimp']}%|{close_gimp}%"
-                        f"|{round(trade_data[ticker]['open_bid_price_acc'], 0) - round(trade_data[ticker]['close_bid_price_acc'], 0):,}원"
-                        f"|{time_object_korea.strftime('%m-%d %H:%M')}\n"
+                        f"|{round(position_data[ticker]['position_gimp'],2)}%|{close_gimp}%"
+                        f"|{round(trade_data[ticker]['open_bid_price_acc']) - round(trade_data[ticker]['close_bid_price_acc']):,}원"
+                        f"|{time_object_korea.strftime('%d일 %H:%M')}\n"
                     )
         for i in range(len(open_timestamp)):
             timestamp = min(open_timestamp)
@@ -526,11 +592,21 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
 
             open_gimp_limit = min_position_gimp - install_weight
 
-            message += f"🙆🏻진입현황({len(position_gimp_list)}/{POSITION_MAX_COUNT})|{min_position_gimp}%\n"
-            message += f"🌊물타기|{min_ticker}|{position_data[min_ticker]['open_install_check']}|{round(open_gimp_limit,2)}%\n"
+            if exchange_data['close_mode'] == 0:
+                close_gimp_gap = CLOSE_GIMP_GAP + len(position_gimp_list) * 0.012
+            elif exchange_data['close_mode'] == 1:
+                close_gimp_gap = CLOSE_GIMP_GAP - 0.1 + len(position_gimp_list) * 0.012
+            elif exchange_data['close_mode'] == 2:
+                close_gimp_gap = CLOSE_GIMP_GAP - 0.2 + len(position_gimp_list) * 0.012
+            elif exchange_data['close_mode'] == 3:
+                close_gimp_gap = CLOSE_GIMP_GAP - 0.3 + len(position_gimp_list) * 0.012
 
+            message += f"🙆🏻진입현황({len(position_gimp_list)}/{POSITION_MAX_COUNT})|{min_position_gimp}% 이하\n"
+            message += f"🌊물타기|{min_ticker}|{round(open_gimp_limit, 2)}% 이하\n"
+            message += f"⚡️종료모드|{exchange_data['close_mode']}|{round(close_gimp_gap,2)}% 이상\n"
+            
         if remain_bid_balance['balance'] < BALANCE:
-            message += f"💰잔액: {round(remain_bid_balance['balance'], 0):,}원"
+            message += f"💰잔액: {round(remain_bid_balance['balance']):,}원"
 
         if len(message) == 0:
             message = f"🌚 진입 정보 없음"

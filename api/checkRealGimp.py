@@ -63,8 +63,8 @@ async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
         if exchange_data['avg_gimp'] < exchange_data['low_gimp']:
             logging.info(f"저점 갱신, {round(exchange_data['low_gimp'], 2)}%->{round(exchange_data['avg_gimp'], 2)}%({round(exchange_data['fix_avg_gimp'], 2)}%)")
             message = f"🌚 김프 저점 갱신\n"
-            message += f"고정실제저점김프: {round(exchange_data['fix_avg_gimp'], 2)}%|{round(exchange_data['avg_gimp'], 2)}%\n"
-            message += f"고정실제환율: {TETHER:,}원|{usd_price:,}원"
+            message += f"실제고정저점김프: {round(exchange_data['avg_gimp'], 2)}%|{round(exchange_data['fix_avg_gimp'], 2)}%\n"
+            message += f"실제고정환율: {TETHER:,}원|{usd_price:,}원"
 
             exchange_data['low_gimp'] = exchange_data['avg_gimp']
             exchange_data['fix_low_gimp'] = exchange_data['fix_avg_gimp']
@@ -77,11 +77,11 @@ async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
             if acc_ticker_count['BTC']['open_count'] > OPEN_GIMP_COUNT:
                 exchange_data['grid_check'] += 1
                 logging.info(f"저점 횡보 확인! 진입 설정 {round(exchange_data['low_gimp'], 2)}% <-> {round(exchange_data['low_gimp'] + GRID_CHECK_GAP, 2)}% | {round(exchange_data['avg_gimp'],2)}%")
-                if exchange_data['grid_check'] <= 3:
+                if exchange_data['grid_check'] <= 1:
                     message = f"🌝저점 횡보 확인!\n"
-                    message += f"고정실제김프: {round(exchange_data['fix_avg_gimp'], 2)}%|{round(exchange_data['avg_gimp'], 2)}%\n"
+                    message += f"실제고정김프: {round(exchange_data['avg_gimp'], 2)}%|{round(exchange_data['fix_avg_gimp'], 2)}%\n"
                     message += f"실제진입김프설정: {round(exchange_data['low_gimp'] + GRID_CHECK_GAP, 2)}% 이하 진입\n"
-                    message += f"고정실제환율: {TETHER:,}원|{usd_price:,}원"
+                    message += f"고정실제환율: {usd_price:,}원|{TETHER:,}원"
                     await util.send_to_telegram(message)
             else:
                 exchange_data['grid_check'] = 0
@@ -92,10 +92,10 @@ async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
             exchange_data['fix_low_gimp'] = exchange_data['fix_avg_gimp'] - 1
             exchange_data['grid_check'] = 0
 
-            message = f"🌚 추세 전환, 신규 저점 설정 \n"
-            message += f"고정실제고점김프: {round(exchange_data['fix_avg_gimp'], 2)}%|{round(exchange_data['avg_gimp'], 2)}%\n"
-            message += f"고정실제저점김프: {round(exchange_data['fix_low_gimp'], 2)}%|{round(exchange_data['low_gimp'], 2)}%\n"
-            message += f"고정실제환율: {TETHER:,}원|{usd_price:,}원"
+            message = f"🤡 추세 전환, 신규 저점 설정 \n"
+            message += f"실제고정고점김프: {round(exchange_data['avg_gimp'], 2)}%|{round(exchange_data['fix_avg_gimp'], 2)}%\n"
+            message += f"실제고정저점김프: {round(exchange_data['low_gimp'], 2)}%|{round(exchange_data['fix_low_gimp'], 2)}%\n"
+            message += f"실제고정환율: {usd_price:,}원|{TETHER:,}원"
 
             util.put_low_gimp(exchange_data)
             await util.send_to_telegram(message)

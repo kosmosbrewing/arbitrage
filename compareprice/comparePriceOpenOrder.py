@@ -39,6 +39,9 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 continue
 
             if order_flag['open'] == 0:
+                if ticker not in exchange_data['upbit_top_ticker']:
+                    continue
+
                 if open_gimp - close_gimp > CURR_GIMP_GAP:
                     continue
 
@@ -48,10 +51,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 if position_data[ticker]['open_install_count'] == 0:
                     if position_ticker_count['count'] == 0 and exchange_data['grid_check'] == 0:
                         continue
-                    '''
-                    if position_ticker_count['count'] == 0 and open_gimp > position_data[ticker]['front_close_gimp'] - RE_OPEN_GIMP_GAP:
-                        continue
-                    '''
+
                     if position_ticker_count['count'] >= POSITION_MAX_COUNT:
                         continue
 
@@ -60,7 +60,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     elif 1.8 <= exchange_data['avg_gimp'] < 2.8:
                         install_weight = INSTALL_WEIGHT + 0.02
                     elif 2.8 <= exchange_data['avg_gimp'] < 3.8:
-                        install_weight = INSTALL_WEIGHT + 0
+                        install_weight = INSTALL_WEIGHT + 0.04
                     elif exchange_data['avg_gimp'] > 3.8:
                         install_weight = INSTALL_WEIGHT + 0.06
 
@@ -90,7 +90,10 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             elif order_flag['open'] == -1:
                 continue
 
-            open_installment = OPEN_INSTALLMENT
+            if position_ticker_count['count'] == 0:
+                open_installment = 0.05
+            else:
+                open_installment = OPEN_INSTALLMENT
 
             # 매수/매도(숏) 기준 가격 잡기 (개수 계산)
             open_quantity = round(BALANCE * open_installment / open_bid, exchange_data[ticker]['quantity_precision'])
@@ -110,12 +113,18 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 continue
 
             order_lock = asyncio.Lock()
-            order_result = {}
+            order_result = {
+                'uuid': 0, 'orderId': 0, 'upbit_price': 0, 'upbit_quantity': 0, 'binance_price': 0, 'binance_quantity': 0
+            }
 
             await asyncio.gather(
-                binance.futures_order(ticker + 'USDT', 'ask', open_quantity, order_result, order_lock),
-                upbit.spot_order('KRW-' + ticker, 'bid', upbit_open_bid_price, 0, order_result, order_lock)
+                ## UPBIT : ticker, side, price, quantity, order_result, lock
+                ## BINANCE : ticker, side, quantity, order_result, lock
+                upbit.spot_order('KRW-' + ticker, 'bid', upbit_open_bid_price, 0, order_result, order_lock),
+                binance.futures_order(ticker + 'USDT', 'ask', open_quantity, order_result, order_lock)
             )
+
+            order_flag = {"open": 0, "close": 0, "ticker": 0}
 
             if order_result['uuid'] == 0 or order_result['orderId'] == 0:
                 message = f'{ticker} 진입 실패 {round(open_gimp, 3)}%\n'
@@ -187,7 +196,6 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                            f"고정환율: {TETHER:,}원\n")
                 # 주문 로직
                 open_message_list.append(message)
-                order_flag = {"open": 0, "close": 0, "ticker": 0}
                 util.put_order_flag(order_flag)
                 open_flag = 1
 

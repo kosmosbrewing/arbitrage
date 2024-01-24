@@ -1,7 +1,9 @@
+import time
 import traceback
 from datetime import datetime
 
 import aiohttp
+import pandas as pd
 import pyupbit
 
 import util
@@ -41,29 +43,31 @@ async def check_order(order_result, lock):
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
     server_url = 'https://api.upbit.com'
 
-    params = {
-        'uuid': order_result['uuid']
-    }
-    query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
-    m = hashlib.sha512()
-    m.update(query_string)
-    query_hash = m.hexdigest()
+    for i in range(5):
+        params = {
+            'uuid': order_result['uuid']
+        }
+        query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
+        m = hashlib.sha512()
+        m.update(query_string)
+        query_hash = m.hexdigest()
 
-    payload = {
-        'access_key': access_key,
-        'nonce': str(uuid.uuid4()),
-        'query_hash': query_hash,
-        'query_hash_alg': 'SHA512',
-    }
+        payload = {
+            'access_key': access_key,
+            'nonce': str(uuid.uuid4()),
+            'query_hash': query_hash,
+            'query_hash_alg': 'SHA512',
+        }
 
-    jwt_token = jwt.encode(payload, secret_key)
-    authorization = 'Bearer {}'.format(jwt_token)
-    headers = {
-        'Authorization': authorization,
-    }
-    async with lock:
-        for i in range(3):
+        jwt_token = jwt.encode(payload, secret_key)
+        authorization = 'Bearer {}'.format(jwt_token)
+        headers = {
+            'Authorization': authorization,
+        }
+        async with lock:
             try:
+                await asyncio.sleep(0.5)
+
                 async with aiohttp.ClientSession() as session:
                     async with session.get(server_url + '/v1/order', params=params, headers=headers) as res:
                         data = await res.json()
@@ -80,6 +84,9 @@ async def check_order(order_result, lock):
             except Exception as e:
                 logging.info("ORDER CHECK >> UPBIT 주문 확인 실패... 재시도")
                 logging.info(f"Exception : {e}")
+
+
+
         
 
 async def spot_order(ticker, side, price, volume, order_result, lock):
@@ -168,6 +175,16 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                         data = await asyncio.wait_for(websocket.recv(), 10)
                         data = ujson.loads(data)
 
+                        timestamp = time.time()
+
+                        if 'timestamp' in data:
+                            time_diff = timestamp - data['timestamp']/1000
+
+                            if time_diff > 1:
+                                continue
+                        else:
+                            continue
+
                         if 'code' not in data: # 응답 데이터(딕셔너리)에 code가 없는 경우 제외
                             logging.info(f"{exchange} [Data error] : {data}")
                             continue
@@ -215,3 +232,42 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
         except ConnectionRefusedError:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
+
+
+async def accum_top_ticker(exchange_data):
+    server_url = 'https://api.upbit.com'
+
+    exchange = UPBIT
+    ticker_list = []
+    accum_list = []
+
+    exchange_data['upbit_top_ticker'] = ['BTC', 'ETH']
+
+    for ticker in get_all_ticker():
+        symbol = ticker.split("-")[1]
+
+        params = {
+            'market': ticker,
+            'count': 1
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(server_url + '/v1/candles/minutes/60', params=params) as res:
+                data = await res.json()
+
+        await asyncio.sleep(0.3)
+
+        ticker_list.append(symbol)
+        accum_list.append(data[0]['candle_acc_trade_price'])
+
+    for i in range(POSITION_MAX_COUNT):
+        max_accum_data = max(accum_list)
+        ticker_index = accum_list.index(max_accum_data)
+        max_ticker = ticker_list[ticker_index]
+
+        exchange_data['upbit_top_ticker'].append(max_ticker)
+
+        accum_list.remove(max_accum_data)
+        ticker_list.remove(max_ticker)
+
+    exchange_data['upbit_top_ticker'] = list(set(exchange_data['upbit_top_ticker']))
+    logging.info(f"UPBIT_TOP_TICKER : {exchange_data['upbit_top_ticker']}")

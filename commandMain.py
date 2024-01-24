@@ -3,6 +3,8 @@ import util
 import traceback
 import logging
 import subprocess
+
+from api import upbit
 from consts import *
 from aiogram import Bot, Dispatcher, executor, types
 from graph import graphUtil
@@ -33,6 +35,7 @@ class Premium:
         dp.register_message_handler(self.set_grid, commands="set_grid")
         dp.register_message_handler(self.order, commands="order")
         dp.register_message_handler(self.restart, commands="restart")
+        dp.register_message_handler(self.set_close, commands="set_close")
         executor.start_polling(dp)
 
     async def current(self, message: types.Message):
@@ -49,12 +52,13 @@ class Premium:
         else:
             util.load_orderbook_check(self.orderbook_check)
             util.load_remain_position(self.position_data, self.trade_data, self.position_ticker_count)
+            util.load_close_mode(self.exchange_data)
 
             for ticker in self.position_data:
                 if self.position_data[ticker]['position'] == 1:
                     self.remain_bid_balance['balance'] -= self.trade_data[ticker]['open_bid_price_acc'] - self.trade_data[ticker]['close_bid_price_acc']
 
-            message = util.get_profit_position(self.orderbook_check, self.position_data, self.trade_data, self.remain_bid_balance)
+            message = util.get_profit_position(self.orderbook_check, self.position_data, self.trade_data, self.remain_bid_balance, self.exchange_data)
             await self.bot.send_message(chat_id=self.allowed_chat_id , text=message)
 
     async def order(self, message: types.Message):
@@ -110,7 +114,34 @@ class Premium:
 
                 util.put_low_gimp(exchange_data)
 
-                message = f"🌝 진입 그리드 최저 값 설정 : {exchange_data['low_gimp']}%"
+                message = f"🌝 진입 그리드 최저 값 설정 : {exchange_data}%"
+                await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
+
+            except Exception as e:
+                message = '🌚 오류 발생..'
+                await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
+                logging.info(traceback.format_exc())
+
+    async def set_close(self, message: types.Message):
+        command, *args = message.text.split()
+
+        chat_id = message.chat.id
+
+        if chat_id != self.allowed_chat_id:
+            await message.reply("죄송합니다. 이 채팅에 참여할 권한이 없습니다.")
+        else:
+            if not args:
+                await message.reply("🌚 숫자를 입력 하세요.")
+                return
+            try:
+                close_mode = args[0]
+
+                exchange_data = {}
+                exchange_data['close_mode'] = close_mode
+
+                util.put_close_mode(exchange_data)
+
+                message = f"🌝 종료 모드 설정 : {exchange_data}\n"
                 await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)
 
             except Exception as e:
@@ -177,11 +208,12 @@ class Premium:
                 plt.clf()
                 front_gap = {}
                 measure_ticker = {}
-                # BTC랑 ETH는 무조건 추가
-                measure_ticker['BTC'] = {"units": []}
-                measure_ticker['ETH'] = {"units": []}
-                measure_ticker['XRP'] = {"units": []}
-                measure_ticker['SOL'] = {"units": []}
+                exchange_data = {}
+
+                util.load_top_ticker(exchange_data)
+                logging.info(f"TOP TICKER {exchange_data}")
+                for ticker in exchange_data['upbit_top_ticker']:
+                    measure_ticker[ticker] = {"units": []}
 
                 for line in lines:
                     try:
@@ -219,6 +251,7 @@ class Premium:
                     if ticker in measure_ticker:
                         measure_ticker[ticker]['units'].append({"open_gap": open_gap, "close_gap": close_gap,
                                                                 "btc_open_gap": btc_open_gap, "hour_min_second": hour_min_second})
+
                 # 그래프 변수 초기화
                 subplot_loc = []
                 for i in range(0, 100):
@@ -227,6 +260,15 @@ class Premium:
                 figure_idx = 0
                 subplot_idx = 0
                 image_set = []
+
+                delete_ticker = []
+                for ticker in measure_ticker:
+                    if len(measure_ticker[ticker]['units']) < 10:
+                        logging.info(f"Graph 출력 티커 제거 {ticker}")
+                        delete_ticker.append(ticker)
+
+                for ticker in delete_ticker:
+                    del measure_ticker[ticker]
 
                 for graph_ticker in measure_ticker:
                     # 데이터 준비
@@ -244,7 +286,8 @@ class Premium:
                     time_len = len(time)
 
                     # 그래프 그리기
-                    plt.figure(figure_idx, figsize=(18, 12))  # 그래프 개수
+                    if subplot_idx == 0:
+                        plt.figure(figure_idx, figsize=(18, 12))           # 그래프 크기
                     plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
                     plt.title(graph_ticker + '[' + date + ']')
 
@@ -271,6 +314,12 @@ class Premium:
                         plt.savefig(image_temp, format='png')
                         figure_idx += 1
                         subplot_idx = 0
+                        plt.close('all')
+
+                if subplot_idx > 0:
+                    image_temp = image_file_path + '_' + str(figure_idx + 1) + '.png'
+                    image_set.append(image_temp)
+                    plt.savefig(image_temp, format='png')
 
                 message = f'[News Coo 🦤] 기준일자: {date}\n🔵진입김프|🔴탈출김프|⚫️Bitcoin진입김프'
                 await self.bot.send_message(chat_id=self.allowed_chat_id, text=message)

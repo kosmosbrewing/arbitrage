@@ -17,12 +17,14 @@ TELEGRAM_MESSAGE_MAX_SIZE = 4095
 
 # DELAY
 GET_ORDER_DATA_DELAY = 20 * 3600          # Binance Order Data 수신 주기
+GET_TOP_TICKER_DELAY = 60 * 60            # UPBIT TOP TICKER 수신 주기
 SOCKET_ORDERBOOK_DELAY = 15
 CHECK_ORDERBOOK_START_DELAY = 2 * 60      # 호가창 계산 실행대기
 COMPARE_PRICE_START_DELAY = 2 * 60        # ComparePrice 시작 딜레이
 COMPARE_PRICE_ORDER_DELAY = 4 * 60        # ComparePrice*Order 시작 딜레이
 COMPARE_PRICE_CHECK_DELAY = 30            # ComparePriceCheck 시작 딜레이
-CHECK_REAL_GIMP_DELAY = 30		  # CheckRealGimp 시작 딜레이
+CHECK_REAL_GIMP_DELAY = 30		          # CheckRealGimp 시작 딜레이
+COMPARE_PRICE_ORDER = 5                   # ComparePriceOrder 수행 주기
 COMPARE_PRICE_CHECK = 20                  # ComparePriceCheck 수행 주기
 CHECK_REAL_GIMP = 20                                    # CheckRealGimp 수행 주기
 TIME_DIFF_CHECK_DELAY = 30 * 60           # 바이낸스 서버와 시간비교 주기, 30분

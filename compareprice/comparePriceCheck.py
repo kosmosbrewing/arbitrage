@@ -96,13 +96,13 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
             position_data[min_ticker]['open_install_check'] = 1
 
             if exchange_data['avg_gimp'] < 1.8:
-                install_weight = 0.2
-            elif 1.8 <= exchange_data['avg_gimp'] < 2.8:
                 install_weight = 0.3
+            elif 1.8 <= exchange_data['avg_gimp'] < 2.8:
+                install_weight = 0.45
             elif 2.8 <= exchange_data['avg_gimp'] < 3.8:
-                install_weight = 0.4
+                install_weight = 0.6
             elif exchange_data['avg_gimp'] > 3.8:
-                install_weight = 0.5
+                install_weight = 0.9
 
             position_ticker_count['open_gimp_limit'] = min_position_gimp - install_weight
     except Exception as e:

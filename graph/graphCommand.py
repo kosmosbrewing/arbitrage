@@ -3,6 +3,7 @@ import sys
 from matplotlib import pyplot as plt
 import measure
 import graphUtil
+from api import upbit
 from measure import *
 
 today = datetime.date.today()
@@ -21,12 +22,12 @@ async def make_graph(date=yesterday):
 
     lines = graphUtil.load_history_data(date)
     measure_ticker = {}
+    exchange_data = {}
 
-    # BTC랑 ETH는 무조건 추가
-    measure_ticker['BTC'] = {"units": []}
-    measure_ticker['ETH'] = {"units": []}
-    measure_ticker['XRP'] = {"units": []}
-    measure_ticker['SOL'] = {"units": []}
+    await upbit.accum_top_ticker(exchange_data)
+
+    for ticker in exchange_data['upbit_top_ticker']:
+        measure_ticker[ticker] = {"units": []}
 
     front_gap = {}
 
