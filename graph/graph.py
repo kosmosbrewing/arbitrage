@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import traceback
 
 from matplotlib import pyplot as plt
 import measure
@@ -22,13 +23,12 @@ async def make_graph(date=yesterday):
 
     lines = graphUtil.load_history_data(date)
     measure_ticker = measure.get_measure_ticker(date)
-
+    #measure_ticker = {}
     # BTC랑 ETH는 무조건 추가
     measure_ticker['BTC'] = {"units": []}
     measure_ticker['ETH'] = {"units": []}
-    measure_ticker['XRP'] = {"units": []}
     measure_ticker['SOL'] = {"units": []}
-
+    measure_ticker['USDT'] = {"units": []}
     front_gap = {}
 
     for line in lines:
@@ -45,94 +45,166 @@ async def make_graph(date=yesterday):
             open_gap = float(split_data[3])
             close_gap = float(split_data[6])
             btc_open_gap = float(split_data[9])
+
+            if ticker in ["USDT"]:
+                upbit_15_rsi = 0
+                binance_15_rsi = 0
+                upbit_240_rsi = 0
+                binance_240_rsi = 0
+                rsi_15_gap = 0
+                rsi_240_gap = 0
+            else:
+                upbit_15_rsi = float(split_data[17].split('/')[0])
+                binance_15_rsi = float(split_data[19].split('/')[1])
+                upbit_240_rsi = float(split_data[17].split('/')[0])
+                binance_240_rsi = float(split_data[19].split('/')[1])
+                rsi_15_gap = float(split_data[21].split('/')[0])
+                rsi_240_gap = float(split_data[21].split('/')[1])
         except:
             continue
 
         if ticker not in front_gap:
-            front_gap[ticker] = {"front_open_gap": open_gap, "front_close_gap": close_gap, "front_btc_open_gap": btc_open_gap}
+            front_gap[ticker] = {"front_open_gap": open_gap, "front_close_gap": close_gap,
+                                 "front_btc_open_gap": btc_open_gap}
 
-        front_open_gap = front_gap[ticker]['front_open_gap']
-        front_close_gap = front_gap[ticker]['front_close_gap']
-        front_btc_open_gap = front_gap[ticker]['front_btc_open_gap']
+        try:
+            front_open_gap = front_gap[ticker]['front_open_gap']
+            front_close_gap = front_gap[ticker]['front_close_gap']
+            front_btc_open_gap = front_gap[ticker]['front_btc_open_gap']
 
-        if abs(open_gap - front_open_gap) > 3 or abs(close_gap - front_close_gap) > 3 or abs(btc_open_gap - front_btc_open_gap) > 3:
-            continue
+            if abs(open_gap - front_open_gap) > 3 or abs(close_gap - front_close_gap) > 3 or abs(
+                    btc_open_gap - front_btc_open_gap) > 3:
+                continue
 
-        front_gap[ticker]['front_open_gap'] = open_gap
-        front_gap[ticker]['front_close_gap'] = close_gap
-        front_gap[ticker]['front_btc_open_gap'] = btc_open_gap
+            front_gap[ticker]['front_open_gap'] = open_gap
+            front_gap[ticker]['front_close_gap'] = close_gap
+            front_gap[ticker]['front_btc_open_gap'] = btc_open_gap
 
-        # 전일자 데이터 담기
-        if ticker in measure_ticker:
-            measure_ticker[ticker]['units'].append({"open_gap": open_gap, "close_gap": close_gap,
-                                                    "btc_open_gap": btc_open_gap, "hour_min_second": hour_min_second})
+            # 전일자 데이터 담기
+            if ticker in measure_ticker:
+                measure_ticker[ticker]['units'].append({"open_gap": open_gap, "close_gap": close_gap,
+                                                        "btc_open_gap": btc_open_gap, "hour_min_second": hour_min_second,
+                                                        "upbit_15_rsi": upbit_15_rsi, "binance_15_rsi": binance_15_rsi,
+                                                        "upbit_240_rsi": upbit_240_rsi, "binance_240_rsi": binance_240_rsi,
+                                                        "rsi_15_gap": rsi_15_gap, "rsi_240_gap": rsi_240_gap})
+        except Exception as e:
+            print(e)
 
     # 그래프 변수 초기화
     subplot_loc = []
-    for i in range(0,100):
-        subplot_loc.append([221, 222, 223, 224])
+    for i in range(0, 100):
+        subplot_loc.append([221, 223, 222, 224])
 
     figure_idx = 0
     subplot_idx = 0
     image_set = []
 
     for graph_ticker in measure_ticker:
-        # 데이터 준비
+        # 그래프 그리기
         open_gap = []
         close_gap = []
         btc_open_gap = []
+        rsi_15_gap = []
+        rsi_240_gap = []
         time = []
+        remain_dix = 0
 
-        for i in range(0, len(measure_ticker[graph_ticker]['units'])):
-            open_gap.append(float(measure_ticker[graph_ticker]['units'][i]['open_gap']))
-            close_gap.append(float(measure_ticker[graph_ticker]['units'][i]['close_gap']))
-            btc_open_gap.append(float(measure_ticker[graph_ticker]['units'][i]['btc_open_gap']))
-            time.append(measure_ticker[graph_ticker]['units'][i]['hour_min_second'])
+        try:
+            for i in range(0, len(measure_ticker[graph_ticker]['units'])):
+                open_gap.append(float(measure_ticker[graph_ticker]['units'][i]['open_gap']))
+                close_gap.append(float(measure_ticker[graph_ticker]['units'][i]['close_gap']))
+                btc_open_gap.append(float(measure_ticker[graph_ticker]['units'][i]['btc_open_gap']))
+                time.append(measure_ticker[graph_ticker]['units'][i]['hour_min_second'])
+                rsi_15_gap.append(float(measure_ticker[graph_ticker]['units'][i]['rsi_15_gap']))
+                rsi_240_gap.append(float(measure_ticker[graph_ticker]['units'][i]['rsi_240_gap']))
+
+            if graph_ticker == "USDT":
+                rsi_15_gap = []
+                rsi_240_gap = []
+                time = []
+                for i in range(0, len(measure_ticker['BTC']['units'])):
+                    time.append(measure_ticker['BTC']['units'][i]['hour_min_second'])
+                    rsi_15_gap.append(float(measure_ticker['BTC']['units'][i]['rsi_15_gap']))
+                    rsi_240_gap.append(float(measure_ticker['BTC']['units'][i]['rsi_240_gap']))
+
+        except Exception as e:
+            print(e)
 
         time_len = len(time)
 
-        # 그래프 그리기
-        plt.figure(figure_idx,figsize=(18, 12)) # 그래프 개수
-        plt.subplot(subplot_loc[figure_idx][subplot_idx]) # 그래프 위치
-        plt.title(graph_ticker + '[' + date + ']')
+        try:
+            show_x_values = [time[0], time[round(time_len / 6)], time[round(time_len * 2 / 6)],
+                             time[round(time_len * 3 / 6)],
+                             time[round(time_len * 4 / 6)], time[round(time_len * 5 / 6)], time[time_len - 1]]
 
-        #plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
-        #plt.plot(close_gap, label='close', color='red', linewidth=0.6)
-        #plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
+            ##### 데이터 그래프
+            plt.figure(figure_idx, figsize=(18, 12))  # 그래프 개수
+            plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
+            plt.title(graph_ticker + '[' + date + ']')
+            ## 시간 미포함
+            # plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
+            # plt.plot(close_gap, label='close', color='red', linewidth=0.6)
+            # plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
+            ## 시간 포함
+            plt.plot(time, open_gap, label='open', color='blue', linewidth=0.6)
+            plt.plot(time, close_gap, label='close', color='red', linewidth=0.6)
+            plt.plot(time, btc_open_gap, label='open', color='black', linewidth=0.6)
+            plt.xlabel('time')
+            plt.ylabel('gap')
+            plt.xticks(show_x_values)
+            for val in show_x_values:
+                plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)
 
-        plt.xlabel('time')
-        plt.ylabel('gap')
+            subplot_idx += 1
+            
+            ##### RSI 그래프
+            plt.figure(figure_idx, figsize=(18, 12))
+            plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
+            plt.title(graph_ticker + '_RSI' + '[' + date + ']')
+            ## 시간 미포함
+            # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
+            # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
+            ## 시간 포함
+            plt.plot(time, rsi_15_gap, label='open', color='purple', linewidth=0.6)
+            plt.plot(time, rsi_240_gap, label='open', color='pink', linewidth=0.6)
+            ### 시간 포함
+            plt.xlabel('time')
+            plt.ylabel('gap')
 
-        plt.plot(time, open_gap, label='open', color='blue', linewidth=0.6)
-        plt.plot(time, close_gap, label='close', color='red', linewidth=0.6)
-        plt.plot(time, btc_open_gap, label='open', color='black', linewidth=0.6)
+            show_x_values = [time[0], time[round(time_len / 6)], time[round(time_len * 2 / 6)],
+                             time[round(time_len * 3 / 6)],
+                             time[round(time_len * 4 / 6)], time[round(time_len * 5 / 6)], time[time_len - 1]]
+            plt.xticks(show_x_values)
+            for val in show_x_values:
+                plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)
+      
+            subplot_idx += 1
 
-        show_x_values = [time[0], time[round(time_len/6)], time[round(time_len*2/6)], time[round(time_len*3/6)],
-                         time[round(time_len*4/6)], time[round(time_len*5/6)], time[time_len-1]]
-        plt.xticks(show_x_values)
-        for val in show_x_values:
-            plt.axvline(x=val, color='lightgray', linestyle='--', linewidth=0.7)
+            if subplot_idx == 4:
+                image_temp = image_file_path + '_' + str(figure_idx + 1) + '.png'
+                image_set.append(image_temp)
+                plt.savefig(image_temp, format='png')
+                figure_idx += 1
+                subplot_idx = 0
+                remain_dix = 1
 
-        subplot_idx += 1
-
-        if subplot_idx == 4:
-            image_temp = image_file_path + '_' + str(figure_idx+1) + '.png'
-            image_set.append(image_temp)
-            plt.savefig(image_temp, format='png')
-            figure_idx += 1
-            subplot_idx = 0
-
-    if subplot_idx != 4:
+        except Exception as e:
+            print(f"{ticker} 오류.. Continue... {e}")
+            continue
+    if subplot_idx != 4 and remain_dix == 0:
         image_temp = image_file_path + '_' + str(figure_idx + 1) + '.png'
         image_set.append(image_temp)
         plt.savefig(image_temp, format='png')
 
-    #plt.show()
-    message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
-    await graphUtil.send_to_telegram(message)
+    try:
+        # plt.show()
+        message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
+        await graphUtil.send_to_telegram(message)
 
-    for image in image_set:
-        await graphUtil.send_to_telegram_image(image)
+        for image in image_set:
+            await graphUtil.send_to_telegram_image(image)
+    except Exception as e:
+        print(e)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

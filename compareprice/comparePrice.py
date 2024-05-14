@@ -2,40 +2,64 @@ from collections import deque
 import logging
 from consts import *
 
-@profile
 def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count, accum_ticker_data):
     """ self.exchange_data 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
     for ticker in orderbook_check:
-        if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
+        if ticker in ["TON"]:  # 스테이블코인은 비교 제외
             continue
 
         base_exchange = UPBIT
         compare_exchange = BINANCE
-        # 가격 정보가 없으면 pass
-        if orderbook_check[ticker][base_exchange] is None or orderbook_check[ticker][compare_exchange] is None:
-            continue
 
-        open_bid = float(orderbook_check[ticker][base_exchange]['balance_ask_average'])
-        close_bid = float(orderbook_check[ticker][base_exchange]['balance_bid_average'])
+        if ticker not in ["USDT"]:
+            # 가격 정보가 없으면 pass
+            if orderbook_check[ticker][base_exchange] is None or orderbook_check[ticker][compare_exchange] is None:
+                continue
 
-        open_ask = float(orderbook_check[ticker][compare_exchange]['balance_bid_average'])
-        close_ask = float(orderbook_check[ticker][compare_exchange]['balance_ask_average'])
+            open_bid = float(orderbook_check[ticker][base_exchange]['balance_ask_average'])
+            close_bid = float(orderbook_check[ticker][base_exchange]['balance_bid_average'])
 
-        open_bid_btc = float(orderbook_check['BTC'][base_exchange]['balance_ask_average'])
-        open_ask_btc = float(orderbook_check['BTC'][compare_exchange]['balance_bid_average'])
+            open_ask = float(orderbook_check[ticker][compare_exchange]['balance_bid_average'])
+            close_ask = float(orderbook_check[ticker][compare_exchange]['balance_ask_average'])
 
-        if open_bid == 0 or close_bid == 0:
-            continue
+            open_bid_btc = float(orderbook_check['BTC'][base_exchange]['balance_ask_average'])
+            open_ask_btc = float(orderbook_check['BTC'][compare_exchange]['balance_bid_average'])
 
-        if open_ask == 0 or close_ask == 0:
-            continue
 
-        if open_bid_btc == 0 or open_ask_btc == 0:
-            continue
+            if open_bid == 0 or close_bid == 0:
+                continue
 
-        open_gimp = open_bid / open_ask * 100 - 100
-        close_gimp = close_bid / close_ask * 100 - 100
-        btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
+            if open_ask == 0 or close_ask == 0:
+                continue
+
+            if open_bid_btc == 0 or open_ask_btc == 0:
+                continue
+
+            open_gimp = open_bid / open_ask * 100 - 100
+            close_gimp = close_bid / close_ask * 100 - 100
+            btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
+
+        elif ticker in ["USDT"]:
+
+            open_bid = float(orderbook_check[ticker][BITHUMB]['balance_ask_average'])
+            close_bid = float(orderbook_check[ticker][BITHUMB]['balance_bid_average'])
+
+            open_ask = 0
+            close_ask = 0
+
+            open_bid_btc = float(orderbook_check['BTC'][base_exchange]['balance_ask_average'])
+            open_ask_btc = float(orderbook_check['BTC'][compare_exchange]['balance_bid_average'])
+
+            if open_bid == 0 or close_bid == 0:
+                continue
+
+            if open_bid_btc == 0 or open_ask_btc == 0:
+                continue
+
+            open_gimp = open_bid / TETHER * 100 - 100
+            close_gimp = close_bid / TETHER * 100 - 100
+            btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
+
 
         ## 데이터 값 초기화
         if ticker not in check_data:
@@ -78,12 +102,20 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
             message += "|CLOSE|{}|{}/{}".format(round(close_gimp,3), f"{round(close_bid,2):,.2f}", f"{round(close_ask,2):,.2f}")
             message += "|BTC_OPEN|{}".format(round(btc_open_gimp,3))
             message += "|LOW_OPEN|{}".format(round(check_data[ticker]['open_gimp'],3))
-            message += "|AVG_OPEN|{}".format(round(average_open_gimp,3))
-            message += "|OPEN_CNT|{}".format(sum(accum_ticker_count[ticker]))
+            #message += "|AVG_OPEN|{}".format(round(average_open_gimp,3))
+            #message += "|OPEN_CNT|{}".format(sum(accum_ticker_count[ticker]))
             message += "|AMOUNT|{}/{}".format(f"{orderbook_check[ticker][base_exchange]['ask_amount']:,.0f}",
                 f"{orderbook_check[ticker][compare_exchange]['bid_amount']:,.0f}")
             message += "|DOLLAR|{}".format(TETHER)
+            if ticker == "USDT":
+                ticker = 'BTC'
+            message += "|U_RSI|{}/{}".format(exchange_data['upbit_15_rsi'][ticker],exchange_data['upbit_240_rsi'][ticker])
+            message += "|B_RSI|{}/{}".format(exchange_data['binance_15_rsi'][ticker],exchange_data['binance_240_rsi'][ticker])
+            message += "|RSI_GAP|{}/{}".format(round(exchange_data['upbit_15_rsi'][ticker]-exchange_data['binance_15_rsi'][ticker], 2),
+                                             round(exchange_data['upbit_240_rsi'][ticker]-exchange_data['binance_240_rsi'][ticker], 2))
+            #message += "|USDT|{}".format(open_bid_usdt)
+            #message += "|USDT_OPEN|{}".format(round(usdt_open_gimp,3))
         except:
-            message += "호가미수신"
+            message += "|호가미수신"
 
         logging.info(f"{message}")

@@ -4,7 +4,8 @@ ENV = 'local'
 # Exchanges
 UPBIT = 'Upbit'
 BINANCE = 'Binance'
-EXCHANGE_LIST = [UPBIT, BINANCE]
+BITHUMB = 'Bithumb'
+EXCHANGE_LIST = [UPBIT, BINANCE, BITHUMB]
 
 # WEBSOCKET
 SOCKET_PING_INTERVAL = 20
@@ -45,6 +46,8 @@ BTC_GAP = 1.2              # BTC 갭
 POSITION_MAX_COUNT = 7     # 최대 들어갈 티커 개수
 POSITION_CHECK_COUNT = 3   # 진입 중인 다른 티커 김프 확인 개수
 GRID_CHECK_GAP = 0.5
+LEVERAGE = 2
+
 
 # ETC
 MILLION = 100000000    # 억

@@ -1,6 +1,9 @@
 import asyncio
+from collections import Counter
+
+import api.checkRSI
 from compareprice import comparePrice
-from api import upbit, binance, checkOrderbook
+from api import upbit, binance, bithumb, checkOrderbook, checkRSI
 import util
 import traceback
 import logging
@@ -8,7 +11,7 @@ from consts import *
 
 """
     :param exchange : 거래소 명
-    :param exchagne_data : 거래소 별 가격 데이터를 저장할 딕셔너리
+    :param exchange_data : 거래소 별 가격 데이터를 저장할 딕셔너리
     ex) {'USD': {'base': 1349.0}, 'MBL': {'Upbit': 4.29}, 'TRX': {'Upbit': 119.0} }
     :param orderbook_info:거래소 별 거래대금 데이터를 저장할 딕셔너리
     ex) {'BTC': {'Upbit': 214.1, 'Binance': None}}
@@ -16,7 +19,7 @@ from consts import *
 
 class Premium:
     def __init__(self):
-        self.exchagne_data = {}  # 거래소별 가격 데이터를 저장할 딕셔너리
+        self.exchange_data = {}
         self.orderbook_info = {}  # 거래소별 호가 데이터 저장
         self.orderbook_check = {}
         self.socket_connect = {"Upbit": 0, "Binance": 0}
@@ -38,6 +41,9 @@ class Premium:
             , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
             , asyncio.create_task(self.compare_price())
             , asyncio.create_task(self.check_orderbook())
+            , asyncio.create_task(self.get_usdt_price())
+            , asyncio.create_task(self.get_15_rsi())
+            , asyncio.create_task(self.get_240_rsi())
         ])
 
     async def compare_price(self):
@@ -46,14 +52,14 @@ class Premium:
             try:
                 await asyncio.sleep(COMPARE_PRICE_CHECK)
                 orderbook_check = self.orderbook_check.copy()
-                exchagne_data = self.exchagne_data.copy()
+                exchange_data = self.exchange_data.copy()
                 socket_connect = self.socket_connect.copy()
 
                 if socket_connect['Upbit'] == 0 or socket_connect['Binance'] == 0:
                     logging.info(f"Socket 연결 끊어 짐 : {socket_connect}, compare_price_order {SOCKET_RETRY_TIME}초 후 재시도")
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
-                    comparePrice.compare_price(exchagne_data, orderbook_check, self.check_data,
+                    comparePrice.compare_price(exchange_data, orderbook_check, self.check_data,
                                                self.accum_ticker_count, self.accum_ticker_data)
 
             except Exception as e:
@@ -70,15 +76,41 @@ class Premium:
             except Exception as e:
                 logging.info(traceback.format_exc())
 
-    async def get_usd_price(self):
+    async def get_usdt_price(self):
         """ 두나무 API를 이용해 달러가격을 조회하는 함수
         while문을 통해 일정 주기를 기준으로 무한히 반복 """
         while True:
             try:
-                upbit.get_usd_price(self.exchagne_data)
-                await asyncio.sleep(DOLLAR_UPDATE)
+                bithumb.get_usdt_price(self.orderbook_info)
+                await asyncio.sleep(20)
             except Exception as e:
                 logging.info(traceback.format_exc())
+
+    async def get_15_rsi(self):
+        self.exchange_data['upbit_15_rsi'] = {}
+        self.exchange_data['binance_15_rsi'] = {}
+
+        duplicates = api.checkRSI.get_duplicate_ticker()
+
+        try:
+            while True:
+                await checkRSI.check_15_rsi(self.exchange_data, duplicates)
+                await asyncio.sleep(20)
+        except Exception as e:
+            logging.info(traceback.format_exc())
+
+    async def get_240_rsi(self):
+        self.exchange_data['upbit_240_rsi'] = {}
+        self.exchange_data['binance_240_rsi'] = {}
+
+        duplicates = api.checkRSI.get_duplicate_ticker()
+
+        try:
+            while True:
+                await checkRSI.check_240_rsi(self.exchange_data, duplicates)
+                await asyncio.sleep(30)
+        except Exception as e:
+            logging.info(traceback.format_exc())
 
 if __name__ == "__main__":
     premium = Premium()

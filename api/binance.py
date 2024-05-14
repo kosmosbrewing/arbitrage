@@ -46,7 +46,6 @@ def get_binance_order_data(exchange_data):
                 'min_notional': float(s['filters'][5]['notional'])
             }
 
-    
 def get_min_notional(exchange_data):
     """데이터 수신할 SYMBOL 목록"""
     res = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
@@ -322,7 +321,7 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
 
-def change_leverage_all_ticker():
+def change_margintype_all_ticker():
     # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
     access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
@@ -360,3 +359,51 @@ def change_leverage_all_ticker():
         print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
         time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
 
+
+def change_leverage_all_ticker():
+    # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
+    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
+    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
+    server_url = 'https://fapi.binance.com/fapi/v1/leverage'
+
+    print(access_key)
+    print(secret_key)
+
+    # 변경할 레버리지
+    new_leverage = 2
+
+    # 요청 헤더
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-MBX-APIKEY': access_key
+    }
+
+    print(headers)
+
+    # 모든 티커 가져오기
+    exchange_info_url = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
+    exchange_info_response = requests.get(exchange_info_url)
+    symbols = exchange_info_response.json()['symbols']
+    # 각 티커에 대해 레버리지 설정 변경
+    for symbol_info in symbols:
+        symbol = symbol_info['symbol']
+        timestamp = int(time.time() * 1000)
+        # 요청 매개변수
+        params = {
+            'symbol': symbol,
+            'leverage': new_leverage,
+            'timestamp': timestamp
+        }
+        # 시그니처 생성
+        query_string = '&'.join([f'{key}={params[key]}' for key in params])
+        signature = hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+        # API 요청 보내기
+        response = requests.post(server_url, params={**params, 'signature': signature}, headers=headers)
+        data = response.json()
+        # 응답 출력
+        print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
+        time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
+
+
+if __name__ == "__main__":
+    change_leverage_all_ticker()

@@ -1,6 +1,10 @@
 import os
 import datetime
+import sys
+sys.path.append('../api')
+#from api import upbit
 import graphUtil
+
 
 def get_measure_ticker(date):
     check_data = {}
@@ -11,6 +15,9 @@ def get_measure_ticker(date):
     lines = graphUtil.load_history_data(date)
     btc_open_gap = 0
 
+    #upbit.accum_top_ticker(measure_ticker)
+
+    print(f"TEST {measure_ticker}")
     for line in lines:
         try:
             split_data = line.split('|')
@@ -61,7 +68,7 @@ def get_measure_ticker(date):
         if len(measure_ticker) > 4:
             continue
 
-        if close_diff_gap > 1.3:
+        if close_diff_gap > 0.5:
             ## 종료 시점 금액 계산
             # 종료 시점 데이터 갱신
             check_data[ticker].update({"open_gap": open_gap, "open_bid": open_bid, "open_ask": open_ask})

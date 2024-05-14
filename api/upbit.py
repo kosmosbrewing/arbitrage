@@ -251,7 +251,7 @@ async def accum_top_ticker(exchange_data):
             'count': 1
         }
         async with aiohttp.ClientSession() as session:
-            async with session.get(server_url + '/v1/candles/minutes/60', params=params) as res:
+            async with session.get(server_url + '/v1/candles/minutes/15', params=params) as res:
                 data = await res.json()
 
         await asyncio.sleep(0.3)

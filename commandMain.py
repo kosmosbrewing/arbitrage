@@ -210,7 +210,7 @@ class Premium:
                 measure_ticker = {}
                 exchange_data = {}
 
-                util.load_top_ticker(exchange_data)
+                await upbit.accum_top_ticker(exchange_data)
                 logging.info(f"TOP TICKER {exchange_data}")
                 for ticker in exchange_data['upbit_top_ticker']:
                     measure_ticker[ticker] = {"units": []}
@@ -263,7 +263,7 @@ class Premium:
 
                 delete_ticker = []
                 for ticker in measure_ticker:
-                    if len(measure_ticker[ticker]['units']) < 10:
+                    if len(measure_ticker[ticker]['units']) < 12:
                         logging.info(f"Graph 출력 티커 제거 {ticker}")
                         delete_ticker.append(ticker)
 

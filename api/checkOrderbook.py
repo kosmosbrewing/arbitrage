@@ -3,7 +3,7 @@ from consts import *
 def check_orderbook(orderbook_info, orderbook_check):
     # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기
     for ticker in orderbook_info:
-        if ticker in ["USD", "USDT"]:  # 스테이블코인은 비교 제외
+        if ticker in ["TON"]:  # 스테이블코인은 비교 제외
             continue
 
         if ticker not in orderbook_check:

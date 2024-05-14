@@ -4,7 +4,7 @@ import traceback
 import logging
 from consts import *
 from compareprice import comparePriceOpenOrder, comparePriceCheck, comparePriceCloseOrder
-from api import upbit, binance, checkOrderbook, checkRealGimp
+from api import upbit, binance, checkOrderbook, checkRealGimp, checkRSI
 
 class Premium:
     def __init__(self):
@@ -37,6 +37,8 @@ class Premium:
             , asyncio.create_task(self.compare_price_close_order())
             , asyncio.create_task(self.compare_price_check())
             , asyncio.create_task(self.get_profit_position())
+            , asyncio.create_task(self.get_15_rsi())
+            , asyncio.create_task(self.get_240_rsi())
         ])
 
     async def get_binance_order_data(self):
@@ -190,6 +192,32 @@ class Premium:
 
             except Exception as e:
                 logging.info(traceback.format_exc())
+
+    async def get_15_rsi(self):
+        self.exchange_data['upbit_15_rsi'] = {}
+        self.exchange_data['binance_15_rsi'] = {}
+
+        duplicates = checkRSI.get_duplicate_ticker()
+
+        try:
+            while True:
+                await checkRSI.check_15_rsi(self.exchange_data, duplicates)
+                await asyncio.sleep(20)
+        except Exception as e:
+            logging.info(traceback.format_exc())
+
+    async def get_240_rsi(self):
+        self.exchange_data['upbit_240_rsi'] = {}
+        self.exchange_data['binance_240_rsi'] = {}
+
+        duplicates = checkRSI.get_duplicate_ticker()
+
+        try:
+            while True:
+                await checkRSI.check_240_rsi(self.exchange_data, duplicates)
+                await asyncio.sleep(30)
+        except Exception as e:
+            logging.info(traceback.format_exc())
 
 if __name__ == "__main__":
     premium = Premium()
