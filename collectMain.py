@@ -35,10 +35,10 @@ class Premium:
 
     async def run(self):
         # 달러가격 및 거래소별 소켓연결, 누적거래대금을 조회가 동작하도록 만드는 main함수
-
+        common_ticker = checkOrderbook.get_common_orderbook_ticker()
         await asyncio.wait([
-            asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect))
-            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
+            asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect, common_ticker))
+            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect, common_ticker))
             , asyncio.create_task(self.compare_price())
             , asyncio.create_task(self.check_orderbook())
             , asyncio.create_task(self.get_usdt_price())

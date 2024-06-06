@@ -45,15 +45,56 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 if open_gimp - close_gimp > CURR_GIMP_GAP:
                     continue
 
+                if btc_open_gimp < open_gimp - 0.75:
+                    continue
+
                 if position_data[ticker]['open_install_count'] == 0:
-                    if exchange_data['upbit_15_rsi'][ticker] < 0:
-                        print(1)
+                    rsi_15_gap = exchange_data['upbit_15_rsi'][ticker] - exchange_data['binance_15_rsi'][ticker]
+                    rsi_240_gap = exchange_data['upbit_240_rsi'][ticker] - exchange_data['binance_240_rsi'][ticker]
+                    ## 4시간 RSI 거시적 뷰
+                    ## 과매도 (급락일 때 PASS)
+                    if exchange_data['upbit_240_rsi'][ticker] <= 35 and exchange_data['binance_240_rsi'][ticker] <= 35:
+                        position_data[ticker]['open_limit_count'] = 0
+                        continue
 
+                    ## 4시간 RSI 과매수, 방망이 길게 가져가기
+                    elif exchange_data['upbit_240_rsi'][ticker] >= 65 and exchange_data['binance_240_rsi'][ticker] >= 65:
+                        if rsi_15_gap > 0:
+                            position_data[ticker]['open_limit_count'] = 0
 
+                        if rsi_240_gap > -1 or rsi_15_gap > -3:
+                            continue
 
+                        #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP + 0.15
+                        close_mode = 0
+
+                    else:
+                        ## 과매도 (급락일 때 PASS)
+                        if exchange_data['upbit_15_rsi'][ticker] <= 35 and exchange_data['binance_15_rsi'][ticker] <= 35:
+                            continue
+                        ## 과매수 일 때
+                        elif exchange_data['upbit_15_rsi'][ticker] >= 65 and exchange_data['binance_15_rsi'][ticker] >= 65:
+                            if rsi_15_gap > 0:
+                                position_data[ticker]['open_limit_count'] = 0
+
+                            if rsi_15_gap > -3:
+                                continue
+                        else:
+                            if rsi_15_gap > 0:
+                                position_data[ticker]['open_limit_count'] = 0
+
+                            if rsi_15_gap > -5:
+                                continue
+
+                        if rsi_240_gap > 1.5:
+                            #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP - 0.12
+                            close_mode = 1
+                        else:
+                            #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP
+                            close_mode = 2
 
                     position_data[ticker]['open_limit_count'] += 1
-                    if position_data[ticker]['open_limit_count'] < 3:
+                    if position_data[ticker]['open_limit_count'] < 50:
                         continue
                 else:
                     continue
@@ -85,11 +126,81 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     f"SKIP|{ticker}|{round(open_gimp, 2)}%|잔고부족|REMAIN_BID|{remain_bid_balance['balance']}|OPEN_BID|{upbit_open_bid_price}")
                 continue
 
+
+            order_result = {
+                'uuid': 0, 'orderId': 0, 'upbit_price': open_bid, 'upbit_quantity': open_quantity, 'binance_price': open_ask, 'binance_quantity': open_quantity
+            }
+
+            logging.info(f"CHECK_ORDER_RESULT|{order_result}")
+            remain_bid_balance['balance'] -= order_result['upbit_price'] * order_result['upbit_quantity']
+            order_result['binance_price'] = order_result['binance_price']
+            order_open_gimp = order_result['upbit_price'] / order_result['binance_price'] * 100 - 100
+
+            ## 진입 성공 시 포지션 데이터 Update
+            if position_data[ticker]['open_install_count'] == 0:
+                position_data[ticker]['open_timestamp'] = datetime.now().timestamp()
+                position_ticker_count['count'] += 1
+
+            position_data[ticker]['open_install_count'] += 1
+            position_data[ticker]['acc_open_install_count'] += 1
+            position_data[ticker]['position_gimp_acc'].append(order_open_gimp)
+            position_data[ticker]['position_gimp_acc_weight'].append(open_installment)
+            position_data[ticker]['open_limit_count'] = 0
+
+            if close_mode == 0:
+                position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP + 0.1
+            elif close_mode == 1:
+                position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP - 0.1
+            elif close_mode == 2:
+                position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP
+
+            temp_gimp = 0
+            for i in range(len(position_data[ticker]['position_gimp_acc_weight'])):
+                weight = position_data[ticker]['position_gimp_acc_weight'][i] / sum(position_data[ticker]['position_gimp_acc_weight'])
+                temp_gimp += position_data[ticker]['position_gimp_acc'][i] * weight
+            position_data[ticker]['position_gimp'] = round(temp_gimp, 3)
+            position_data[ticker]['position'] = 1
+            position_data[ticker]['close_count'] = 0
+
+            trade_data[ticker]['upbit_total_quantity'] += order_result['upbit_quantity']
+            trade_data[ticker]['binance_total_quantity'] += order_result['binance_quantity']
+            trade_data[ticker]['open_bid_price_acc'] += order_result['upbit_price'] * order_result['upbit_quantity']
+            trade_data[ticker]['open_ask_price_acc'] += order_result['binance_price'] * order_result['binance_quantity']
+
+            check_data[ticker].update({
+                "open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
+                "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
+            })
+
+            # 텔레그램 전송 및 로깅 데이터
+            message = (f"{ticker} 진입\n"
+                       f"요청주문김프: {round(open_gimp, 3)}%|{round(order_open_gimp, 3)}%\n"
+                       f"목표종료: {order_open_gimp + position_data[ticker]['target_grid']}%({position_data[ticker]['target_grid']})%\n"
+                       f"RSI: {round(exchange_data['upbit_15_rsi'][ticker], 2)}%|{round(exchange_data['binance_15_rsi'][ticker], 2)}%\n"
+                       f"누적진입김프: {position_data[ticker]['position_gimp']}%\n"
+                       f"BTC김프: {round(btc_open_gimp, 3)}%\n"
+                       f"변동성: {acc_ticker_count[ticker]['open_count']}\n"
+                       f"분할매수매도: {position_data[ticker]['open_install_count']}|{position_data[ticker]['close_install_count']}\n"
+                       f"요청가격: {round(open_bid, 2):,}원/{round(open_ask, 2):,}원\n"
+                       f"주문가격: {round(order_result['upbit_price'], 2):,}원|{round(order_result['binance_price'], 2):,}원\n"
+                       f"슬리피지: {round(order_result['upbit_price'] / open_bid * 100 - 100, 3)}%|{round(order_result['binance_price'] / open_ask * 100 - 100, 3)}%\n"
+                       f"진입누적가격: {round(trade_data[ticker]['open_bid_price_acc'], 2):,}원|{round(trade_data[ticker]['open_ask_price_acc'], 2):,}원\n"
+                       f"종료누적가격: {round(trade_data[ticker]['close_ask_price_acc'], 2):,}원|{round(trade_data[ticker]['close_ask_price_acc'], 2):,}원\n"
+                       f"진입수량: {order_result['upbit_quantity']}|{order_result['binance_quantity']}\n"
+                       f"총진입수량: {trade_data[ticker]['upbit_total_quantity']}|{trade_data[ticker]['binance_total_quantity']}\n"
+                       f"잔액: {round(remain_bid_balance['balance'], 2):,}원\n"
+                       f"고정환율: {TETHER:,}원\n")
+            # 주문 로직
+            open_message_list.append(message)
+            util.put_order_flag(order_flag)
+            open_flag = 1
+
+            '''
             order_lock = asyncio.Lock()
             order_result = {
                 'uuid': 0, 'orderId': 0, 'upbit_price': 0, 'upbit_quantity': 0, 'binance_price': 0, 'binance_quantity': 0
-            }
-
+            }    
+    
             await asyncio.gather(
                 ## UPBIT : ticker, side, price, quantity, order_result, lock
                 ## BINANCE : ticker, side, quantity, order_result, lock
@@ -113,7 +224,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                     upbit.check_order(order_result, check_order_lock),
                     binance.check_order(ticker + 'USDT', order_result, check_order_lock)
                 )
-
+            
             async with check_order_lock:
                 logging.info(f"CHECK_ORDER_RESULT|{order_result}")
                 remain_bid_balance['balance'] -= order_result['upbit_price'] * order_result['upbit_quantity']
@@ -130,7 +241,6 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 position_data[ticker]['position_gimp_acc'].append(order_open_gimp)
                 position_data[ticker]['position_gimp_acc_weight'].append(open_installment)
                 position_data[ticker]['open_limit_count'] = 0
-                position_data[ticker]['front_position_gimp'] = order_open_gimp
 
                 temp_gimp = 0
                 for i in range(len(position_data[ticker]['position_gimp_acc_weight'])):
@@ -154,7 +264,6 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 message = (f"{ticker} 진입\n"
                            f"요청주문김프: {round(open_gimp, 3)}%|{round(order_open_gimp, 3)}%\n"
                            f"누적진입김프: {position_data[ticker]['position_gimp']}%\n"
-                           f"직전최소진입김프: {round(exchange_data['front_position_gimp'], 2)}%\n"
                            f"BTC김프: {round(btc_open_gimp, 3)}%\n"
                            f"변동성: {acc_ticker_count[ticker]['open_count']}\n"
                            f"분할매수매도: {position_data[ticker]['open_install_count']}|{position_data[ticker]['close_install_count']}\n"
@@ -170,7 +279,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 # 주문 로직
                 open_message_list.append(message)
                 util.put_order_flag(order_flag)
-                open_flag = 1
+                open_flag = 1'''
 
         except Exception as e:
             logging.info(f"OpenOrder 오류: {traceback.format_exc()}")

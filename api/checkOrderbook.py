@@ -1,4 +1,25 @@
 from consts import *
+from api import upbit, binance
+from collections import Counter
+
+def get_common_orderbook_ticker():
+    krw_ticker = upbit.get_all_ticker()
+    usdt_ticker = binance.get_all_book_ticker()
+
+    for i in range(len(krw_ticker)):
+        krw_ticker[i] = krw_ticker[i].split('-')[1]
+
+    for i in range(len(usdt_ticker)):
+        usdt_ticker[i] = usdt_ticker[i].replace("usdt@depth", "")
+        usdt_ticker[i] = usdt_ticker[i].upper()
+
+    krw_ticker = set(krw_ticker)
+    usdt_ticker = set(usdt_ticker)
+
+    counter = Counter(list(krw_ticker) + list(usdt_ticker))
+
+    # 빈도가 1보다 큰 요소들을 찾아 중복된 값을 구합니다.
+    return [element for element, count in counter.items() if count > 1]
 
 def check_orderbook(orderbook_info, orderbook_check):
     # 거래소별 socket 연결을 통해 필요한 코인정보가 있어서 대기

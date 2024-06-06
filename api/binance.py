@@ -16,6 +16,7 @@ import hmac
 import util
 from consts import *
 from datetime import datetime, timezone, timedelta
+from api import checkOrderbook
 
 """
 Docs: https://binance-docs.github.io/apidocs/spot/en/
@@ -32,6 +33,7 @@ def get_all_book_ticker():
     res = res.json()
 
     return [s['symbol'].lower() + "@depth" for s in res['symbols'] if "USDT" in s['symbol']]
+
 
 def get_binance_order_data(exchange_data):
     """데이터 수신할 SYMBOL 목록"""
@@ -209,22 +211,28 @@ async def funding_fee():
         print(f"Exception : {e}")
 
 
-async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
+async def connect_socket_futures_orderbook(orderbook_info, socket_connect, common_ticker):
     """Binance 소켓연결"""
     exchange = BINANCE
+    tickers = []
+
+    for i in range(len(common_ticker)):
+        tickers.append(common_ticker[i].lower() + 'usdt@depth')
+
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket")
+
+    params_ticker = []
+
     while True:
         try:
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
 
             async with (websockets.connect('wss://fstream.binance.com/ws', ping_interval=SOCKET_PING_INTERVAL,
-                                          ping_timeout=SOCKET_PING_TIMEOUT, max_queue=10000) as websocket):
+                                          ping_timeout=SOCKET_PING_TIMEOUT, max_queue=50000) as websocket):
                 socket_connect[exchange] = 1
                 logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook) | Socket Connect: {socket_connect}")
 
-                params_ticker = []
-                tickers = get_all_book_ticker()
                 for idx, ticker in enumerate(tickers):
                     params_ticker.append(ticker)
 
@@ -239,7 +247,7 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
 
                         logging.info(f"{exchange} Orderbook 데이터 요청 등록")
                         await websocket.send(subscribe_data)
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(0.5)
                         params_ticker = []
 
                 logging.info(f"{exchange} 소켓 Orderbook 데이터 수신")
@@ -299,17 +307,20 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
                             logging.info(f'{exchange} Websocket 연결 24시간 초과, 재연결 수행')
                             break
                         '''
-                    except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                    except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed) as e:
                         try:
                             socket_connect[exchange] = 0
-                            logging.info(f"{exchange} WebSocket 데이터 수신 Timeout {SOCKET_PING_TIMEOUT}초 후 재연결 합니다.")
+                            logging.info(f"{exchange} WebSocket 데이터 수신 Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
+                            logging.info(f"Exception : {e}")
                             pong = await websocket.ping()
-                            await asyncio.wait_for(pong, timeout=SOCKET_PING_TIMEOUT)
+                            await asyncio.wait_for(pong, timeout=SOCKET_RETRY_TIME)
                             socket_connect[exchange] = 1
                         except:
-                            logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
+                            logging.info(f"{exchange} WebSocket Polling Timeout 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             break
+                    except ConnectionResetError as e:
+                        break
                 logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect}")
                 await websocket.close()
         except socket.gaierror:
@@ -318,6 +329,10 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect):
             continue
         except ConnectionRefusedError:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
+            await asyncio.sleep(SOCKET_RETRY_TIME)
+            continue
+        except Exception as e:
+            logging.info(f"그외 에러 Exception : {e} {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
 
@@ -406,4 +421,4 @@ def change_leverage_all_ticker():
 
 
 if __name__ == "__main__":
-    change_leverage_all_ticker()
+    get_all_book_ticker()

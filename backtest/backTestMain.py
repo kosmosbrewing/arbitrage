@@ -16,8 +16,8 @@ def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum
         # close_count = 손절로직 동작 체크 횟수
         position_data[ticker] = {"open_install_count": 0, "close_install_count": 0, "position": 0, "position_gimp": 0,
                                  "position_gimp_accum": [], "accum_open_install_count": 0,
-                                 "position_gimp_accum_weight": [], "position_close_gimp_accum": [],
-                                 "front_close_gimp": 0}
+                                 "position_gimp_accum_weight": [], "position_close_gimp_accum": []
+                                 }
     if ticker not in trade_data:
         # open_bid_price =  포지션 진입 업비트 현물 매수 총 금액
         # open_ask_price = 포지션 종료 업비트 현물 매도 총 금액
@@ -73,7 +73,7 @@ def get_measure_ticker():
         if ticker not in check_data:
             check_data[ticker] = {"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                   "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask,
-                                  "front_open_gimp": open_gimp, "front_close_gimp": close_gimp}
+                                  "front_open_gimp": open_gimp}
 
         data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum_ticker_data)
         accum_ticker_data[ticker].append(open_gimp)
@@ -111,10 +111,10 @@ def get_measure_ticker():
                 accum_ticker_count[ticker].append(0)
                 continue
 
+            ''' 
             if trade_data[ticker]['profit_count'] > 0 and open_gimp > position_data[ticker]['front_close_gimp'] - 0.5:
                 continue
-
-            ''' 
+                           
             if open_gimp > average_open_gimp and open_gimp > btc_open_gimp * BTC_GAP:
                 accum_ticker_count[ticker].append(0)
                 continue'''
@@ -222,7 +222,6 @@ def get_measure_ticker():
                 get_ticker_profit(trade_data, open_profit, close_profit, total_fee, ticker)
                 remain_bid_balance += install_open_bid_price
                 position_data[ticker]['position_close_gimp_accum'].append(close_gimp)
-                #position_data[ticker]['front_close_gimp'] = close_gimp
 
                 if position_data[ticker]['close_install_count'] * CLOSE_INSTALLMENT == 1:
                     # 종료 시점 데이터 갱신

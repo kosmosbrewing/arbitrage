@@ -18,8 +18,8 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                 position_data[ticker] = {
                     "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                     "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                    "profit_count": 0, "front_close_gimp": 0, "open_timestamp": 0, "open_limit_count": 0,
-                    "open_install_check": 0, "front_position_gimp": 0, "close_limit_count": 0
+                    "profit_count": 0, "open_timestamp": 0, "open_limit_count": 0,
+                    "close_limit_count": 0, "target_grid": 0, "close_max_gimp": 0, "close_stop_gimp": 0
                 }
             if ticker not in trade_data:
                 trade_data[ticker] = {
@@ -36,7 +36,6 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                 }
             ## 포지션 진입 중인 데이터 확인
             if position_data[ticker]['position'] == 1:
-                position_data[ticker]['open_install_check'] = 0
                 position_gimp_list.append(position_data[ticker]['position_gimp'])
                 position_ticker_list.append(ticker)
 
@@ -89,21 +88,9 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
         if len(position_gimp_list) > 0:
             min_position_gimp = min(position_gimp_list)
 
-            exchange_data['front_position_gimp'] = min_position_gimp
-
             ticker_index = position_gimp_list.index(min_position_gimp)
             min_ticker = position_ticker_list[ticker_index]
-            position_data[min_ticker]['open_install_check'] = 1
 
-            if exchange_data['avg_gimp'] < 1.8:
-                install_weight = 0.3
-            elif 1.8 <= exchange_data['avg_gimp'] < 2.8:
-                install_weight = 0.45
-            elif 2.8 <= exchange_data['avg_gimp'] < 3.8:
-                install_weight = 0.6
-            elif exchange_data['avg_gimp'] > 3.8:
-                install_weight = 0.9
 
-            position_ticker_count['open_gimp_limit'] = min_position_gimp - install_weight
     except Exception as e:
         logging.info(f"OpenCheck 오류: {traceback.format_exc()}")

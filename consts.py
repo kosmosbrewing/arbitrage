@@ -47,7 +47,7 @@ POSITION_MAX_COUNT = 7     # 최대 들어갈 티커 개수
 POSITION_CHECK_COUNT = 3   # 진입 중인 다른 티커 김프 확인 개수
 GRID_CHECK_GAP = 0.5
 LEVERAGE = 2
-
+TRAILING_STOP=0.05
 
 # ETC
 MILLION = 100000000    # 억

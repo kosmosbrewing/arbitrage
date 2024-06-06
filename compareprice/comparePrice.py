@@ -104,11 +104,11 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
             message += "|LOW_OPEN|{}".format(round(check_data[ticker]['open_gimp'],3))
             #message += "|AVG_OPEN|{}".format(round(average_open_gimp,3))
             #message += "|OPEN_CNT|{}".format(sum(accum_ticker_count[ticker]))
+            if ticker == "USDT":
+                ticker = 'BTC'
             message += "|AMOUNT|{}/{}".format(f"{orderbook_check[ticker][base_exchange]['ask_amount']:,.0f}",
                 f"{orderbook_check[ticker][compare_exchange]['bid_amount']:,.0f}")
             message += "|DOLLAR|{}".format(TETHER)
-            if ticker == "USDT":
-                ticker = 'BTC'
             message += "|U_RSI|{}/{}".format(exchange_data['upbit_15_rsi'][ticker],exchange_data['upbit_240_rsi'][ticker])
             message += "|B_RSI|{}/{}".format(exchange_data['binance_15_rsi'][ticker],exchange_data['binance_240_rsi'][ticker])
             message += "|RSI_GAP|{}/{}".format(round(exchange_data['upbit_15_rsi'][ticker]-exchange_data['binance_15_rsi'][ticker], 2),

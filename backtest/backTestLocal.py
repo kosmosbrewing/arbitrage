@@ -12,7 +12,7 @@ def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum
         # close_count = 손절로직 동작 체크 횟수
         position_data[ticker] = {"open_install_count": 0, "close_install_count": 0, "position": 0, "position_gimp": 0,
                                  "position_gimp_accum": [], "close_count": 0, "accum_open_install_count": 0,
-                                 "position_gimp_accum_weight": [], "front_close_gimp": 0
+                                 "position_gimp_accum_weight": []
                                  }
     if ticker not in trade_data:
         # open_bid_price =  포지션 진입 업비트 현물 매수 총 금액
@@ -74,7 +74,7 @@ def get_measure_ticker():
         if ticker not in check_data:
             check_data[ticker] = {"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                   "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask,
-                                  "front_open_gimp": open_gimp, "front_close_gimp": close_gimp}
+                                  "front_open_gimp": open_gimp}
 
         data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum_ticker_data)
 

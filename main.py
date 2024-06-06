@@ -25,13 +25,14 @@ class Premium:
 
     async def run(self):
         await util.send_to_telegram('🚀 Start Premium Bot 🚀')
+        common_ticker = checkOrderbook.get_common_orderbook_ticker()
 
         await asyncio.wait([
             asyncio.create_task(self.get_binance_order_data())
             , asyncio.create_task(self.get_upbit_top_ticker())
             , asyncio.create_task(self.check_real_gimp())
-            , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect))
-            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect))
+            , asyncio.create_task(upbit.connect_socket_spot_orderbook(self.orderbook_info, self.socket_connect, common_ticker))
+            , asyncio.create_task(binance.connect_socket_futures_orderbook(self.orderbook_info, self.socket_connect, common_ticker))
             , asyncio.create_task(self.check_orderbook())
             , asyncio.create_task(self.compare_price_open_order())
             , asyncio.create_task(self.compare_price_close_order())
@@ -92,6 +93,7 @@ class Premium:
     async def compare_price_open_order(self):
         await asyncio.sleep(COMPARE_PRICE_ORDER_DELAY)
         logging.info(f"ComparePrice Open Order 기동")
+        socket_check = 0
         while True:
             try:
                 await asyncio.sleep(COMPARE_PRICE_ORDER)
@@ -100,7 +102,13 @@ class Premium:
                 socket_connect = self.socket_connect.copy()
 
                 if socket_connect['Upbit'] == 0 or socket_connect['Binance'] == 0:
-                    logging.info(f"Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_order {SOCKET_RETRY_TIME}초 후 재시도")
+                    message = f"🌚 Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_order {SOCKET_RETRY_TIME}초 후 재시도"
+                    logging.info(message)
+                    socket_check += 1
+
+                    if socket_connect == 3:
+                        socket_check = 0
+
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceOpenOrder.compare_price_open_order(orderbook_check, exchange_data,
@@ -152,7 +160,7 @@ class Premium:
                 if socket_connect['Upbit'] == 0 or socket_connect['Binance'] == 0:
                     message = f"🌚 Socket 연결 끊어 짐 : {socket_connect}, compare_price_open_check {SOCKET_RETRY_TIME}초 후 재시도"
                     logging.info(message)
-                    await util.send_to_telegram(message)
+                    #await util.send_to_telegram(message)
                     await asyncio.sleep(SOCKET_RETRY_TIME)
                 else:
                     await comparePriceCheck.compare_price_check(orderbook_check, self.check_data, self.trade_data,
@@ -197,11 +205,11 @@ class Premium:
         self.exchange_data['upbit_15_rsi'] = {}
         self.exchange_data['binance_15_rsi'] = {}
 
-        duplicates = checkRSI.get_duplicate_ticker()
+        common_ticker = checkOrderbook.get_common_orderbook_ticker()
 
         try:
             while True:
-                await checkRSI.check_15_rsi(self.exchange_data, duplicates)
+                await checkRSI.check_15_rsi(self.exchange_data, common_ticker)
                 await asyncio.sleep(20)
         except Exception as e:
             logging.info(traceback.format_exc())
@@ -210,11 +218,11 @@ class Premium:
         self.exchange_data['upbit_240_rsi'] = {}
         self.exchange_data['binance_240_rsi'] = {}
 
-        duplicates = checkRSI.get_duplicate_ticker()
+        common_ticker = checkOrderbook.get_common_orderbook_ticker()
 
         try:
             while True:
-                await checkRSI.check_240_rsi(self.exchange_data, duplicates)
+                await checkRSI.check_240_rsi(self.exchange_data, common_ticker)
                 await asyncio.sleep(30)
         except Exception as e:
             logging.info(traceback.format_exc())
@@ -222,9 +230,3 @@ class Premium:
 if __name__ == "__main__":
     premium = Premium()
     asyncio.run(premium.run())
-
-
-
-
-
-

@@ -304,7 +304,6 @@ def load_profit_count(position_data):
                 temp_data = json.loads(data)
                 if ticker in position_data:
                     position_data[ticker]['profit_count'] = temp_data['profit_count']
-                    position_data[ticker]['front_close_gimp'] = temp_data['front_close_gimp']
                 elif ticker not in position_data:
                     position_data[ticker] = json.loads(data)
                 logging.info(f"FILE_LOAD|PROFIT_COUNT|{ticker}")
@@ -545,7 +544,6 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                 time_object_utc = datetime.utcfromtimestamp(position_data[ticker]['open_timestamp'])
                 time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
 
-                position_data[ticker]['open_install_check'] = 0
                 position_gimp_list.append(position_data[ticker]['position_gimp'])
                 position_ticker_list.append(ticker)
 
@@ -579,8 +577,9 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
             min_position_gimp = min(position_gimp_list)
             ticker_index = position_gimp_list.index(min_position_gimp)
             min_ticker = position_ticker_list[ticker_index]
-            position_data[min_ticker]['open_install_check'] = 1
 
+            message += f"🙆🏻진입현황({len(position_gimp_list)}/{POSITION_MAX_COUNT})\n"
+            '''
             if real_open_gimp < 1.8:
                 install_weight = 0.2
             elif 1.8 <= real_open_gimp < 2.8:
@@ -589,9 +588,9 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                 install_weight = 0.4
             elif real_open_gimp > 3.8:
                 install_weight = 0.5
-
+                
             open_gimp_limit = min_position_gimp - install_weight
-
+            
             if exchange_data['close_mode'] == 0:
                 close_gimp_gap = CLOSE_GIMP_GAP + len(position_gimp_list) * 0.012
             elif exchange_data['close_mode'] == 1:
@@ -600,11 +599,10 @@ def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_b
                 close_gimp_gap = CLOSE_GIMP_GAP - 0.2 + len(position_gimp_list) * 0.012
             elif exchange_data['close_mode'] == 3:
                 close_gimp_gap = CLOSE_GIMP_GAP - 0.3 + len(position_gimp_list) * 0.012
-
             message += f"🙆🏻진입현황({len(position_gimp_list)}/{POSITION_MAX_COUNT})|{min_position_gimp}% 이하\n"
             message += f"🌊물타기|{min_ticker}|{round(open_gimp_limit, 2)}% 이하\n"
             message += f"⚡️종료모드|{exchange_data['close_mode']}|{round(close_gimp_gap,2)}% 이상\n"
-            
+            '''
         if remain_bid_balance['balance'] < BALANCE:
             message += f"💰잔액: {round(remain_bid_balance['balance']):,}원"
 

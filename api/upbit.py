@@ -1,12 +1,6 @@
 import time
-import traceback
-from datetime import datetime
-
 import aiohttp
-import pandas as pd
 import pyupbit
-
-import util
 from consts import *
 import asyncio
 import websockets
@@ -85,10 +79,6 @@ async def check_order(order_result, lock):
                 logging.info("ORDER CHECK >> UPBIT 주문 확인 실패... 재시도")
                 logging.info(f"Exception : {e}")
 
-
-
-        
-
 async def spot_order(ticker, side, price, volume, order_result, lock):
     access_key = os.environ['UPBIT_OPEN_API_ACCESS_KEY']
     secret_key = os.environ['UPBIT_OPEN_API_SECRET_KEY']
@@ -142,9 +132,13 @@ async def spot_order(ticker, side, price, volume, order_result, lock):
         logging.info(f"Exception : {e}")
         
 
-async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
+async def connect_socket_spot_orderbook(orderbook_info, socket_connect, common_ticker):
     """UPBIT 소켓연결 후 실시간 가격 저장"""
     exchange = UPBIT
+    tickers = []
+    for i in range(len(common_ticker)):
+        tickers.append('KRW-' + common_ticker[i])
+
     await asyncio.sleep(SOCKET_ORDERBOOK_DELAY)
     logging.info(f"{exchange} connect_socket_orderbook")
     while True:
@@ -152,7 +146,7 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
             logging.info(f"{exchange} WebSocket 연결 합니다. (Orderbook)")
 
             async with (websockets.connect('wss://api.upbit.com/websocket/v1', ping_interval=SOCKET_PING_INTERVAL,
-                                           ping_timeout=SOCKET_PING_TIMEOUT, max_queue=10000) as websocket):
+                                           ping_timeout=SOCKET_PING_TIMEOUT, max_queue=50000) as websocket):
                 socket_connect[exchange] = 1
                 logging.info(f"{exchange} WebSocket 연결 완료. (Orderbook) | Socket Connect: {socket_connect}")
 
@@ -160,7 +154,7 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                     {'ticket': str(uuid.uuid4())[:6]},
                     {
                         'type': 'orderbook',
-                        'codes': get_all_ticker(),
+                        'codes': tickers,
                         'isOnlyRealtime': True
                     },
                 ]
@@ -213,7 +207,7 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                             logging.info(f'{exchange} Websocket 연결 24시간 초과, 재연결 수행')
                             break
                         '''
-                    except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                    except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed) as e:
                         try:
                             socket_connect[exchange] = 0
                             logging.info(f"{exchange} WebSocket 데이터 수신 Timeout {SOCKET_PING_TIMEOUT}초 후 재연결 합니다.")
@@ -224,14 +218,17 @@ async def connect_socket_spot_orderbook(orderbook_info, socket_connect):
                             logging.info(f"{exchange} WebSocket Polling Timeout {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
                             await asyncio.sleep(SOCKET_RETRY_TIME)
                             break
+                    except ConnectionResetError as e:
+                        break
                 logging.info(f"{exchange} WebSocket 연결 종료. (Orderbook 초기화) | Socket Connect: {socket_connect}")
                 await websocket.close()
         except socket.gaierror:
             logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
-        except ConnectionRefusedError:
-            logging.info(f"{exchange} WebSocket 연결 실패 {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
+        except Exception as e:
+            logging.info(f"그외 에러 Exception : {e} {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
+            continue
 
 
 async def accum_top_ticker(exchange_data):
@@ -241,7 +238,7 @@ async def accum_top_ticker(exchange_data):
     ticker_list = []
     accum_list = []
 
-    exchange_data['upbit_top_ticker'] = ['BTC', 'ETH']
+    exchange_data['upbit_top_ticker'] = []
 
     for ticker in get_all_ticker():
         symbol = ticker.split("-")[1]
@@ -259,7 +256,7 @@ async def accum_top_ticker(exchange_data):
         ticker_list.append(symbol)
         accum_list.append(data[0]['candle_acc_trade_price'])
 
-    for i in range(POSITION_MAX_COUNT):
+    for i in range(POSITION_MAX_COUNT+1):
         max_accum_data = max(accum_list)
         ticker_index = accum_list.index(max_accum_data)
         max_ticker = ticker_list[ticker_index]
