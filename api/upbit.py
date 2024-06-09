@@ -256,7 +256,7 @@ async def accum_top_ticker(exchange_data):
         ticker_list.append(symbol)
         accum_list.append(data[0]['candle_acc_trade_price'])
 
-    for i in range(POSITION_MAX_COUNT+1):
+    for i in range(POSITION_MAX_COUNT+3):
         max_accum_data = max(accum_list)
         ticker_index = accum_list.index(max_accum_data)
         max_ticker = ticker_list[ticker_index]

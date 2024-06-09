@@ -94,7 +94,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                             close_mode = 2
 
                     position_data[ticker]['open_limit_count'] += 1
-                    if position_data[ticker]['open_limit_count'] < 50:
+                    if position_data[ticker]['open_limit_count'] < OPEN_LIMIT_COUNT:
                         continue
                 else:
                     continue

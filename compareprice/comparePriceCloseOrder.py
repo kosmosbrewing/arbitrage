@@ -56,7 +56,7 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                     }
 
                     ## Trailing Stop 로직 추가
-                    if position_data[ticker]['close_max_gimp'] == 0:
+                    if 'close_max_gimp' not in position_data[ticker] or position_data[ticker]['close_max_gimp'] == 0:
                         position_data[ticker]['close_max_gimp'] = close_gimp
                         position_data[ticker]['close_stop_gimp'] = close_gimp * (1 - TRAILING_STOP)
                         logging.info(f"TRAILING INIT : MAX: {position_data[ticker]['close_max_gimp'] }, STOP: {position_data[ticker]['close_stop_gimp']}")
