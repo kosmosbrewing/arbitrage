@@ -37,7 +37,6 @@ OPEN_INSTALLMENT = 0.1
 OPEN_GIMP_GAP = 0.15       # 변동성 COUNT 할 김프 조건 (ex. 현재 종료 김프 - 저점 진입 김프 = 0.3)
 RE_OPEN_GIMP_GAP = 0.5     # 재진입 티커 김프 조건
 OPEN_GIMP_COUNT = 3        # 변동성 COUNT 횟수
-OPEN_LIMIT_COUNT = 100
 INSTALL_WEIGHT = 0.12      # 분할 진입 가중치
 FRONT_OPEN_COUNT = 150     # 직전 변동성 COUNT 확인 횟수 (ex. 직전 20개 확인)
 FRONT_AVERAGE_COUNT = 600  # 직전 진입 평균 김프 확인 횟수 (ex. 직전 10개 확인)
@@ -49,7 +48,6 @@ POSITION_CHECK_COUNT = 3   # 진입 중인 다른 티커 김프 확인 개수
 GRID_CHECK_GAP = 0.5
 LEVERAGE = 2
 TRAILING_STOP=0.05
-
 
 # ETC
 MILLION = 100000000    # 억
