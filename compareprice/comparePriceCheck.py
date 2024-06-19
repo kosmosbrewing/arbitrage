@@ -18,8 +18,9 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                 position_data[ticker] = {
                     "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                     "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                    "profit_count": 0, "open_timestamp": 0, "open_limit_count": 0,
-                    "close_limit_count": 0, "target_grid": 0, "close_max_gimp": 0, "close_stop_gimp": 0
+                    "profit_count": 0, "open_timestamp": 0, "open_limit_count": 0, "close_limit_count": 0,
+                    "target_grid": 0, "open_ts_count": 0, "close_ts_count": 0,
+                    "open_min_gimp": 0, "open_stop_gimp": 0, "close_max_gimp": 0, "close_stop_gimp": 0
                 }
             if ticker not in trade_data:
                 trade_data[ticker] = {

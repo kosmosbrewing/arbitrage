@@ -99,6 +99,24 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 else:
                     continue
 
+                ## 진입 Trailing Stop 로직 추가
+                if 'open_min_gimp' not in position_data[ticker] or position_data[ticker]['open_min_gimp'] == 0:
+                    position_data[ticker]['open_min_gimp'] = open_gimp
+                    position_data[ticker]['open_stop_gimp'] = open_gimp * (1 + TRAILING_STOP)
+                    logging.info(f"OPEN_TS_INIT|MIN|{position_data[ticker]['open_min_gimp']}|STOP|{position_data[ticker]['open_stop_gimp']}")
+                else:
+                    if open_gimp < position_data[ticker]['open_min_gimp']:
+                        position_data[ticker]['open_min_gimp'] = open_gimp
+                        position_data[ticker]['open_stop_gmp'] = open_gimp * (1 + TRAILING_STOP)
+                        logging.info(f"OPEN_TS_UPDATE|MIN|{position_data[ticker]['open_min_gimp']}|STOP|{position_data[ticker]['open_stop_gmp']}")
+
+                    if open_gimp > position_data[ticker]['open_stop_gmp']:
+                        position_data[ticker]['open_ts_count'] += 1
+                        logging.info(f"OPEN_TS_EXIT|{open_gimp} > {position_data[ticker]['open_stop_gmp']}")
+
+                if position_data[ticker]['open_ts_count'] < 5:
+                    continue
+
             elif order_flag['open'] == 1:
                 if ticker != order_flag['ticker']:
                     continue
@@ -146,6 +164,9 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             position_data[ticker]['position_gimp_acc'].append(order_open_gimp)
             position_data[ticker]['position_gimp_acc_weight'].append(open_installment)
             position_data[ticker]['open_limit_count'] = 0
+            position_data[ticker]['open_ts_count'] = 0
+            position_data[ticker]['open_min_gimp'] = 0
+            position_data[ticker]['open_stop_gimp'] = 0
 
             if close_mode == 0:
                 position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP + 0.1

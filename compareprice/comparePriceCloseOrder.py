@@ -55,24 +55,24 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         'binance_quantity': 0
                     }
 
-                    ## Trailing Stop 로직 추가
+                    ## 종료 Trailing Stop 로직 추가
                     if 'close_max_gimp' not in position_data[ticker] or position_data[ticker]['close_max_gimp'] == 0:
                         position_data[ticker]['close_max_gimp'] = close_gimp
                         position_data[ticker]['close_stop_gimp'] = close_gimp * (1 - TRAILING_STOP)
-                        logging.info(f"TRAILING INIT : MAX: {position_data[ticker]['close_max_gimp'] }, STOP: {position_data[ticker]['close_stop_gimp']}")
+                        logging.info(f"CLOSE_TS_INIT|MAX|{position_data[ticker]['close_max_gimp'] }|STOP|{position_data[ticker]['close_stop_gimp']}")
                     else:
                         if close_gimp > position_data[ticker]['close_max_gimp']:
                             position_data[ticker]['close_max_gimp'] = close_gimp
                             position_data[ticker]['close_stop_gimp'] = close_gimp * (1 - TRAILING_STOP)
-                            logging.info(f"TRAILING TRANS : MAX: {position_data[ticker]['close_max_gimp']}, STOP: {position_data[ticker]['close_stop_gimp']}")
+                            logging.info(f"CLOSE_TS_UPDATE|MAX|{position_data[ticker]['close_max_gimp']}|STOP|{position_data[ticker]['close_stop_gimp']}")
 
                         if close_gimp < position_data[ticker]['close_stop_gimp']:
-                            position_data[ticker]['close_limit_count'] += 1
-                            logging.info(f"TRAILING EXIT :  {close_gimp} < {position_data[ticker]['close_stop_gimp']}")
-                        elif close_gimp - position_data[ticker]['position_gimp'] > 1:
-                            position_data[ticker]['close_limit_count'] += 1
+                            position_data[ticker]['close_ts_count'] += 1
+                            logging.info(f"CLOSE_TS_EXIT|{close_gimp} < {position_data[ticker]['close_stop_gimp']}")
+                        #elif close_gimp - position_data[ticker]['position_gimp'] > 1:
+                        #    position_data[ticker]['close_limit_count'] += 1
 
-                    if position_data[ticker]['close_limit_count'] < 5:
+                    if position_data[ticker]['close_ts_count'] < 5:
                         continue
                     
                     ## 분할 종료 계산
@@ -241,9 +241,11 @@ async def compare_price_close_order(orderbook_check, exchange_data, remain_bid_b
                         position_data[ticker].update({
                             "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
                             "position": 0, "position_gimp": 0, "position_gimp_acc": [], "position_gimp_acc_weight": [],
-                            "open_timestamp": 0,
-                            "close_limit_count": 0, "target_grid": 0, "close_max_gimp": 0, "close_stop_gimp": 0
+                            "open_timestamp": 0, "open_limit_count": 0, "close_limit_count": 0,
+                            "target_grid": 0, "open_ts_count": 0, "close_ts_count": 0,
+                            "open_min_gimp": 0, "open_stop_gimp": 0, "close_max_gimp": 0, "close_stop_gimp": 0
                         })
+
                         ## profit_count, total_profit 제외하고 값 갱신
                         trade_data[ticker].update({
                             "open_bid_price_acc": 0, "open_ask_price_acc": 0,
