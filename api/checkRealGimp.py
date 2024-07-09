@@ -1,11 +1,12 @@
 import logging
-
-import util
-from api import upbit
+from api import hana
 from consts import *
 
 async def check_real_gimp(orderbook_info, exchange_data, acc_ticker_count):
-    usd_price = upbit.get_usd_price()
+    usd_price = hana.get_currency_data("USD")
+    if usd_price == 0:
+        usd_price = TETHER
+
     upbit_balance_ask_average = 0
     real_binance_balance_bid_average = 0
     fix_binance_balance_bid_average = 0

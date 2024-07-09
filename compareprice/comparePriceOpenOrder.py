@@ -6,12 +6,35 @@ from datetime import datetime
 from consts import *
 from api import upbit, binance
 
-async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_balance, check_data, trade_data,
-                                position_data, acc_ticker_count, position_ticker_count, order_flag):
-    """ self.exchange_price 저장된 거래소별 코인정보를 비교하고 특정 (%)이상 갭발생시 알림 전달하는 함수 """
+async def compare_price_open_order(
+        orderbook_check,
+        exchange_data,
+        remain_bid_balance,
+        check_data,
+        trade_data,
+        position_data,
+        acc_ticker_count,
+        position_ticker_count,
+        order_flag
+):
+    """
+        프리미엄을 계산하여 각 거래소 거래 주문을 요청한다.
+        orderbook_check         :
+        exchange_data           :
+        remain_bid_balance      :
+        check_data              :
+        trade_data              :
+        position_data           :
+        acc_ticker_data         :
+        position_ticker_count   :
+        order_flag              :
+    """
+
     open_message_list = []
     open_flag = 0
+    close_mode = 0
 
+    # 티거 데이터 비교
     for ticker in orderbook_check:
         try:
             if open_flag == 1:
@@ -27,7 +50,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             open_bid_btc = orderbook_check['BTC']['Upbit']['balance_ask_average']
             open_ask_btc = orderbook_check['BTC']['Binance']['balance_bid_average']
 
-            ## 가격이 없는 친구들 PASS
+            # 가격이 없는 친구들 PASS
             if open_bid == 0 or close_bid == 0 or open_ask == 0 or close_ask == 0 or open_bid_btc == 0 or open_ask_btc == 0:
                 continue
 
@@ -35,6 +58,10 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             close_gimp = close_bid / close_ask * 100 - 100
             btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
 
+            """ 
+                주문 조건
+                잔고, 주문 플래그, 거래량 많은 티커, 슬리피지가 적은 티커, 진입 안한 티커, RSI 계산, Trailing Stop 등   
+            """
             if remain_bid_balance['balance'] < 0:
                 continue
 
@@ -42,80 +69,77 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 if ticker not in exchange_data['upbit_top_ticker']:
                     continue
 
+                # 진입 Trailing Stop 로직 추가
+                if 'open_min_gimp' not in position_data[ticker] or position_data[ticker]['open_min_gimp'] == 0:
+                    position_data[ticker]['open_min_gimp'] = open_gimp
+                    position_data[ticker]['open_stop_gimp'] = open_gimp + OPEN_TS_GRID
+                    position_data[ticker]['open_ts_count'] = 0
+
+                if open_gimp < position_data[ticker]['open_min_gimp']:
+                    position_data[ticker]['open_min_gimp'] = open_gimp
+                    position_data[ticker]['open_stop_gimp'] = open_gimp + OPEN_TS_GRID
+                    position_data[ticker]['open_ts_count'] = 0
+
                 if open_gimp - close_gimp > CURR_GIMP_GAP:
                     continue
 
                 if btc_open_gimp < open_gimp - 0.75:
                     continue
 
-                if position_data[ticker]['open_install_count'] == 0:
+                # 분할 매수 X
+                if position_data[ticker]['open_install_count'] != 0:
+                    continue
+
+                if position_data[ticker]['open_limit_count'] < OPEN_LIMIT_COUNT:
                     rsi_15_gap = exchange_data['upbit_15_rsi'][ticker] - exchange_data['binance_15_rsi'][ticker]
                     rsi_240_gap = exchange_data['upbit_240_rsi'][ticker] - exchange_data['binance_240_rsi'][ticker]
-                    ## 4시간 RSI 거시적 뷰
-                    ## 과매도 (급락일 때 PASS)
+
+                    # 4시간 RSI 과매도 (급락일 때 PASS)
                     if exchange_data['upbit_240_rsi'][ticker] <= 35 and exchange_data['binance_240_rsi'][ticker] <= 35:
                         position_data[ticker]['open_limit_count'] = 0
                         continue
 
-                    ## 4시간 RSI 과매수, 방망이 길게 가져가기
+                    # 4시간 RSI 과매수, 방망이 길게 가져가기
                     elif exchange_data['upbit_240_rsi'][ticker] >= 65 and exchange_data['binance_240_rsi'][ticker] >= 65:
                         if rsi_15_gap > 0:
                             position_data[ticker]['open_limit_count'] = 0
 
-                        if rsi_240_gap > -1 or rsi_15_gap > -3:
+                        if rsi_240_gap > -1 or rsi_15_gap > -1:
                             continue
 
-                        #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP + 0.15
                         close_mode = 0
-
                     else:
-                        ## 과매도 (급락일 때 PASS)
+                        # 과매도 (급락일 때 PASS)
                         if exchange_data['upbit_15_rsi'][ticker] <= 35 and exchange_data['binance_15_rsi'][ticker] <= 35:
                             continue
-                        ## 과매수 일 때
+                        # 과매수 일 때
                         elif exchange_data['upbit_15_rsi'][ticker] >= 65 and exchange_data['binance_15_rsi'][ticker] >= 65:
+                            if rsi_15_gap > 0:
+                                position_data[ticker]['open_limit_count'] = 0
+
+                            if rsi_15_gap > -1:
+                                continue
+                        else:
                             if rsi_15_gap > 0:
                                 position_data[ticker]['open_limit_count'] = 0
 
                             if rsi_15_gap > -3:
                                 continue
-                        else:
-                            if rsi_15_gap > 0:
-                                position_data[ticker]['open_limit_count'] = 0
-
-                            if rsi_15_gap > -5:
-                                continue
-
                         if rsi_240_gap > 1.5:
-                            #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP - 0.12
                             close_mode = 1
                         else:
-                            #position_data[ticker]['target_grid'] = CLOSE_GIMP_GAP
                             close_mode = 2
 
                     position_data[ticker]['open_limit_count'] += 1
-                    if position_data[ticker]['open_limit_count'] < OPEN_LIMIT_COUNT:
-                        continue
-                else:
                     continue
+            #if position_data[ticker]['open_limit_count'] < OPEN_LIMIT_COUNT:
+            #    continue
 
-                ## 진입 Trailing Stop 로직 추가
-                if 'open_min_gimp' not in position_data[ticker] or position_data[ticker]['open_min_gimp'] == 0:
-                    position_data[ticker]['open_min_gimp'] = open_gimp
-                    position_data[ticker]['open_stop_gimp'] = open_gimp * (1 + TRAILING_STOP)
-                    logging.info(f"OPEN_TS_INIT|MIN|{position_data[ticker]['open_min_gimp']}|STOP|{position_data[ticker]['open_stop_gimp']}")
-                else:
-                    if open_gimp < position_data[ticker]['open_min_gimp']:
-                        position_data[ticker]['open_min_gimp'] = open_gimp
-                        position_data[ticker]['open_stop_gmp'] = open_gimp * (1 + TRAILING_STOP)
-                        logging.info(f"OPEN_TS_UPDATE|MIN|{position_data[ticker]['open_min_gimp']}|STOP|{position_data[ticker]['open_stop_gmp']}")
+            if open_gimp > position_data[ticker]['open_stop_gimp']:
+                position_data[ticker]['open_ts_count'] += 1
 
-                    if open_gimp > position_data[ticker]['open_stop_gmp']:
-                        position_data[ticker]['open_ts_count'] += 1
-                        logging.info(f"OPEN_TS_EXIT|{open_gimp} > {position_data[ticker]['open_stop_gmp']}")
-
-                if position_data[ticker]['open_ts_count'] < 5:
-                    continue
+            if position_data[ticker]['open_ts_count'] < OPEN_TS_COUNT:
+                continue
 
             elif order_flag['open'] == 1:
                 if ticker != order_flag['ticker']:
@@ -140,13 +164,12 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             upbit_open_bid_price = open_bid * open_quantity * LEVERAGE
 
             if remain_bid_balance['balance'] - upbit_open_bid_price < 0:
-                logging.info(
-                    f"SKIP|{ticker}|{round(open_gimp, 2)}%|잔고부족|REMAIN_BID|{remain_bid_balance['balance']}|OPEN_BID|{upbit_open_bid_price}")
+                logging.info(f"SKIP|{ticker}|{round(open_gimp, 2)}%|잔고부족|REMAIN_BID|{remain_bid_balance['balance']}|OPEN_BID|{upbit_open_bid_price}")
                 continue
 
-
             order_result = {
-                'uuid': 0, 'orderId': 0, 'upbit_price': open_bid, 'upbit_quantity': open_quantity, 'binance_price': open_ask, 'binance_quantity': open_quantity
+                'uuid': 0, 'orderId': 0, 'upbit_price': open_bid, 'upbit_quantity': open_quantity,
+                'binance_price': open_ask, 'binance_quantity': open_quantity
             }
 
             logging.info(f"CHECK_ORDER_RESULT|{order_result}")
@@ -154,7 +177,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             order_result['binance_price'] = order_result['binance_price']
             order_open_gimp = order_result['upbit_price'] / order_result['binance_price'] * 100 - 100
 
-            ## 진입 성공 시 포지션 데이터 Update
+            # 진입 성공 시 포지션 데이터 Update
             if position_data[ticker]['open_install_count'] == 0:
                 position_data[ticker]['open_timestamp'] = datetime.now().timestamp()
                 position_ticker_count['count'] += 1
@@ -193,7 +216,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
             })
 
-            # 텔레그램 전송 및 로깅 데이터
+            # Telegram 주문 알림 데이터
             message = (f"{ticker} 진입\n"
                        f"요청주문김프: {round(open_gimp, 3)}%|{round(order_open_gimp, 3)}%\n"
                        f"목표종료: {order_open_gimp + position_data[ticker]['target_grid']}%({position_data[ticker]['target_grid']})%\n"
@@ -211,7 +234,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                        f"총진입수량: {trade_data[ticker]['upbit_total_quantity']}|{trade_data[ticker]['binance_total_quantity']}\n"
                        f"잔액: {round(remain_bid_balance['balance'], 2):,}원\n"
                        f"고정환율: {TETHER:,}원\n")
-            # 주문 로직
+
             open_message_list.append(message)
             util.put_order_flag(order_flag)
             open_flag = 1
@@ -223,8 +246,8 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
             }    
     
             await asyncio.gather(
-                ## UPBIT : ticker, side, price, quantity, order_result, lock
-                ## BINANCE : ticker, side, quantity, order_result, lock
+                # UPBIT : ticker, side, price, quantity, order_result, lock
+                # BINANCE : ticker, side, quantity, order_result, lock
                 upbit.spot_order('KRW-' + ticker, 'bid', upbit_open_bid_price, 0, order_result, order_lock),
                 binance.futures_order(ticker + 'USDT', 'ask', open_quantity, order_result, order_lock)
             )
@@ -252,7 +275,7 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 order_result['binance_price'] = order_result['binance_price'] * TETHER
                 order_open_gimp = order_result['upbit_price'] / order_result['binance_price'] * 100 - 100
 
-                ## 진입 성공 시 포지션 데이터 Update
+                # 진입 성공 시 포지션 데이터 Update
                 if position_data[ticker]['open_install_count'] == 0:
                     position_data[ticker]['open_timestamp'] = datetime.now().timestamp()
                     position_ticker_count['count'] += 1
@@ -301,9 +324,8 @@ async def compare_price_open_order(orderbook_check, exchange_data, remain_bid_ba
                 open_message_list.append(message)
                 util.put_order_flag(order_flag)
                 open_flag = 1'''
-
         except Exception as e:
-            logging.info(f"OpenOrder 오류: {traceback.format_exc()}")
+            logging.info(f"OpenOrder 오류|{e}|{traceback.format_exc()}")
 
     for message in open_message_list:
         logging.info(f"POSITION_OPEN|{message}")

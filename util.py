@@ -8,7 +8,7 @@ import json
 import os
 from logging.handlers import TimedRotatingFileHandler
 
-from api import upbit
+from api import hana
 from consts import *
 from datetime import datetime, timezone, timedelta
 bot = None
@@ -486,7 +486,7 @@ def load_history_data():
 def get_profit_position(orderbook_check, position_data, trade_data, remain_bid_balance, exchange_data):
     # 오늘 날짜 가져오기
     try:
-        usd_price = upbit.get_usd_price()
+        usd_price = hana.get_currency_data("USD")
         btc_open_gimp = 0
         open_timestamp = []
         open_message = {}

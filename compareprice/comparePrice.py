@@ -61,7 +61,7 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
             btc_open_gimp = open_bid_btc / open_ask_btc * 100 - 100
 
 
-        ## 데이터 값 초기화
+        # 데이터 값 초기화
         if ticker not in check_data:
             check_data[ticker] = {"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask}
@@ -86,7 +86,7 @@ def compare_price(exchange_data, orderbook_check, check_data, accum_ticker_count
             check_data[ticker].update({"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                        "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask})
 
-        ## 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
+        # 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
         if close_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
             check_data[ticker].update({"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,
                                        "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask})

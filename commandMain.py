@@ -327,15 +327,15 @@ class Premium:
                                          time[round(time_len * 4 / 6)], time[round(time_len * 5 / 6)],
                                          time[time_len - 1]]
 
-                        ##### 데이터 그래프
+                        #### 데이터 그래프
                         plt.figure(figure_idx, figsize=(18, 12))  # 그래프 개수
                         plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
                         plt.title(graph_ticker + '[' + date + ']')
-                        ## 시간 미포함
+                        # 시간 미포함
                         # plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
                         # plt.plot(close_gap, label='close', color='red', linewidth=0.6)
                         # plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
-                        ## 시간 포함
+                        # 시간 포함
                         plt.plot(time, open_gap, label='open', color='blue', linewidth=0.6)
                         plt.plot(time, close_gap, label='close', color='red', linewidth=0.6)
                         plt.plot(time, btc_open_gap, label='open', color='black', linewidth=0.6)
@@ -346,16 +346,16 @@ class Premium:
 
                         subplot_idx += 1
 
-                        ##### RSI GAP 그래프
+                        #### RSI GAP 그래프
                         plt.figure(figure_idx, figsize=(18, 12))
                         plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
                         # plt.title(graph_ticker + '_RSI_GAP' + '[' + date + ']')
-                        ## 시간 미포함
+                        # 시간 미포함
                         # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
                         # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-                        ## 시간 포함
+                        # 시간 포함
                         plt.plot(time, rsi_15_gap, label='open', color='purple', linewidth=0.6)
-                        ### 시간 포함
+                        ## 시간 포함
                         plt.ylabel('rsi_15_gap')
                         plt.xticks(show_x_values)
                         for val in show_x_values:
@@ -363,16 +363,16 @@ class Premium:
 
                         subplot_idx += 1
 
-                        ##### RSI GAP 그래프
+                        #### RSI GAP 그래프
                         plt.figure(figure_idx, figsize=(18, 12))
                         plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
                         # plt.title(graph_ticker + '_RSI_GAP' + '[' + date + ']')
-                        ## 시간 미포함
+                        # 시간 미포함
                         # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
                         # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-                        ## 시간 포함
+                        # 시간 포함
                         plt.plot(time, rsi_240_gap, label='open', color='pink', linewidth=0.6)
-                        ### 시간 포함
+                        ## 시간 포함
                         plt.ylabel('rsi_240_gap')
                         plt.xticks(show_x_values)
                         for val in show_x_values:
@@ -380,20 +380,20 @@ class Premium:
 
                         subplot_idx += 1
 
-                        ##### RSI 그래프
+                        #### RSI 그래프
                         plt.figure(figure_idx, figsize=(18, 12))
                         plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
                         # plt.title(graph_ticker + '_RSI' + '[' + date + ']')
-                        ## 시간 미포함
+                        # 시간 미포함
                         # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
                         # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-                        ## 시간 포함
+                        # 시간 포함
                         dark_yellow = '#FFB700'
                         plt.plot(time, upbit_15_rsi, label='open', color='blue', linewidth=0.3)
                         plt.plot(time, binance_15_rsi, label='open', color=dark_yellow, linewidth=0.3)
                         plt.plot(time, upbit_240_rsi, label='open', color='blue', linewidth=1.75)
                         plt.plot(time, binance_240_rsi, label='open', color=dark_yellow, linewidth=1.75)
-                        ### 시간 포함
+                        ## 시간 포함
                         plt.ylabel('rsi 15/240')
                         plt.xticks(show_x_values)
                         for val in show_x_values:

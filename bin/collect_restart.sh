@@ -6,7 +6,7 @@ conda activate premium
 
 PID=$(ps -ef | grep collectMain.py | grep -v grep | awk {'print $2'})
 
-## PID 값이 존재할 때
+# PID 값이 존재할 때
 if [ -n $PID ]
 then
         echo "Shutdown collectMain.py"
@@ -20,7 +20,7 @@ sleep 5
 
 PID=$(ps -ef | grep collectMain.py | grep -v grep | awk {'print $2'})
 
-## PID 값이존재하지 않을 때
+# PID 값이존재하지 않을 때
 if [ -z $PID ]
 then
         echo "Boot collectMain.py"

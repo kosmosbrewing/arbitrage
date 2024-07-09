@@ -13,7 +13,7 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
 
     for ticker in orderbook_check:
         try:
-            ## 데이터 값 초기화
+            # 데이터 값 초기화
             if ticker not in position_data:
                 position_data[ticker] = {
                     "open_install_count": 0, "close_install_count": 0, "acc_open_install_count": 0,
@@ -35,7 +35,7 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                     'data': deque(maxlen=FRONT_OPEN_COUNT),
                     'open_count': 0
                 }
-            ## 포지션 진입 중인 데이터 확인
+            # 포지션 진입 중인 데이터 확인
             if position_data[ticker]['position'] == 1:
                 position_gimp_list.append(position_data[ticker]['position_gimp'])
                 position_ticker_list.append(ticker)
@@ -50,7 +50,7 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
             open_bid_btc = orderbook_check['BTC'][base_exchange]['balance_ask_average']
             open_ask_btc = orderbook_check['BTC'][compare_exchange]['balance_bid_average']
 
-            ## 가격이 없는 친구들 PASS
+            # 가격이 없는 친구들 PASS
             if open_bid == 0 or close_bid == 0 or open_ask == 0 or close_ask == 0 or open_bid_btc == 0 or open_ask_btc == 0:
                 continue
 
@@ -70,7 +70,7 @@ async def compare_price_check(orderbook_check, check_data, trade_data,
                     "close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask
                 }
 
-            ## 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
+            # 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
             if open_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
                 check_data[ticker] = {
                     "open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask,

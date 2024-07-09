@@ -6,7 +6,7 @@ conda activate premium
 
 PID=$(ps -ef | grep main.py | grep arbi | grep -v grep | awk {'print $2'})
 
-## PID 값이존재하지 않을 때
+# PID 값이존재하지 않을 때
 if [ -z $PID ]
 then
         echo "Boot main.py"
@@ -24,7 +24,7 @@ sleep 1
 
 PID=$(ps -ef | grep collectMain.py | grep -v grep | awk {'print $2'})
 
-## PID 값이존재하지 않을 때
+# PID 값이존재하지 않을 때
 if [ -z $PID ]
 then
         echo "Boot collectMain.py"
@@ -42,7 +42,7 @@ sleep 1
 
 PID=$(ps -ef | grep commandMain.py | grep -v grep | awk {'print $2'})
 
-## PID 값이존재하지 않을 때
+# PID 값이존재하지 않을 때
 if [ -z $PID ]
 then
         echo "Boot commandMain.py"

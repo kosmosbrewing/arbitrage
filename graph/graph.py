@@ -2,7 +2,6 @@ import asyncio
 import sys
 import traceback
 from matplotlib import pyplot as plt
-import measure
 import graphUtil
 from measure import *
 from api import upbit
@@ -32,12 +31,12 @@ async def make_graph(date=yesterday):
     except Exception as e:
         print(e)
 
+    measure_ticker['USDT'] = {"units": []}
+    measure_ticker['BTC'] = {"units": []}
+    measure_ticker['ETH'] = {"units": []}
+
     for ticker in temp_list['upbit_top_ticker']:
         measure_ticker[ticker] = {"units": []}
-
-    measure_ticker['USDT'] = {"units": []}
-    #measure_ticker['ETH'] = {"units": []}
-    #measure_ticker['SOL'] = {"units": []}
 
     front_gap = {}
 
@@ -75,8 +74,7 @@ async def make_graph(date=yesterday):
             front_close_gap = front_gap[ticker]['front_close_gap']
             front_btc_open_gap = front_gap[ticker]['front_btc_open_gap']
 
-            if abs(open_gap - front_open_gap) > 1 or abs(close_gap - front_close_gap) > 1 or abs(
-                    btc_open_gap - front_btc_open_gap) > 1:
+            if abs(open_gap - front_open_gap) > 1 or abs(close_gap - front_close_gap) > 1 or abs(btc_open_gap - front_btc_open_gap) > 1:
                 continue
 
             front_gap[ticker]['front_open_gap'] = open_gap
@@ -141,15 +139,15 @@ async def make_graph(date=yesterday):
                              time[round(time_len * 3 / 6)],
                              time[round(time_len * 4 / 6)], time[round(time_len * 5 / 6)], time[time_len - 1]]
 
-            ##### 데이터 그래프
+            #### 데이터 그래프
             plt.figure(figure_idx, figsize=(18, 12))  # 그래프 개수
             plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
             plt.title(graph_ticker + '[' + date + ']')
-            ## 시간 미포함
+            # 시간 미포함
             # plt.plot(open_gap, label='open', color='blue', linewidth=0.6)
             # plt.plot(close_gap, label='close', color='red', linewidth=0.6)
             # plt.plot(btc_open_gap, label='open', color='black', linewidth=0.6)
-            ## 시간 포함
+            # 시간 포함
             plt.plot(time, open_gap, label='open', color='blue', linewidth=0.6)
             plt.plot(time, close_gap, label='close', color='red', linewidth=0.6)
             plt.plot(time, btc_open_gap, label='open', color='black', linewidth=0.6)
@@ -160,16 +158,16 @@ async def make_graph(date=yesterday):
 
             subplot_idx += 1
             
-            ##### RSI GAP 그래프
+            #### RSI GAP 그래프
             plt.figure(figure_idx, figsize=(18, 12))
             plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
             #plt.title(graph_ticker + '_RSI_GAP' + '[' + date + ']')
-            ## 시간 미포함
+            # 시간 미포함
             # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
             # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-            ## 시간 포함
+            # 시간 포함
             plt.plot(time, rsi_15_gap, label='open', color='purple', linewidth=0.6)
-            ### 시간 포함
+            ## 시간 포함
             plt.ylabel('rsi_15_gap')
             plt.xticks(show_x_values)
             for val in show_x_values:
@@ -177,16 +175,16 @@ async def make_graph(date=yesterday):
 
             subplot_idx += 1
 
-            ##### RSI GAP 그래프
+            #### RSI GAP 그래프
             plt.figure(figure_idx, figsize=(18, 12))
             plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
             #plt.title(graph_ticker + '_RSI_GAP' + '[' + date + ']')
-            ## 시간 미포함
+            # 시간 미포함
             # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
             # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-            ## 시간 포함
+            # 시간 포함
             plt.plot(time, rsi_240_gap, label='open', color='pink', linewidth=0.6)
-            ### 시간 포함
+            ## 시간 포함
             plt.ylabel('rsi_240_gap')
             plt.xticks(show_x_values)
             for val in show_x_values:
@@ -194,20 +192,20 @@ async def make_graph(date=yesterday):
 
             subplot_idx += 1
 
-            ##### RSI 그래프
+            #### RSI 그래프
             plt.figure(figure_idx, figsize=(18, 12))
             plt.subplot(subplot_loc[figure_idx][subplot_idx])  # 그래프 위치
             #plt.title(graph_ticker + '_RSI' + '[' + date + ']')
-            ## 시간 미포함
+            # 시간 미포함
             # plt.plot(rsi_15_gap, label='open', color='purple', linewidth=0.6)
             # plt.plot(rsi_240_gap, label='open', color='pink', linewidth=0.6)
-            ## 시간 포함
+            # 시간 포함
             dark_yellow = '#FFB700'
             plt.plot(time, upbit_15_rsi, label='open', color='blue', linewidth=0.3)
             plt.plot(time, binance_15_rsi, label='open', color=dark_yellow, linewidth=0.3)
             plt.plot(time, upbit_240_rsi, label='open', color='blue', linewidth=1.75)
             plt.plot(time, binance_240_rsi, label='open', color=dark_yellow, linewidth=1.75)
-            ### 시간 포함
+            ## 시간 포함
             plt.ylabel('rsi 15/240')
             plt.xticks(show_x_values)
             for val in show_x_values:
@@ -236,7 +234,11 @@ async def make_graph(date=yesterday):
         message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
         await graphUtil.send_to_telegram(message)
 
+        print(image_set)
+
         image_set = list(set(image_set))
+
+        print(image_set)
 
         for image in image_set:
             await graphUtil.send_to_telegram_image(image)
