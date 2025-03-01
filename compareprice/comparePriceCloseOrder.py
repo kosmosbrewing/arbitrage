@@ -65,7 +65,8 @@ async def compare_price_close_order(
                         position_data[ticker]['close_ts_count'] += 1
 
                 # 손절
-                if close_gimp - position_data[ticker]['position_gimp'] < -0.4:
+
+                if close_gimp - position_data[ticker]['position_gimp'] < -0.3:
                     if open_gimp - close_gimp > CURR_GIMP_GAP:
                         continue
 
@@ -73,6 +74,7 @@ async def compare_price_close_order(
 
                     # elif close_gimp - position_data[ticker]['position_gimp'] > 1:
                     #    position_data[ticker]['close_limit_count'] += 1
+
 
                 # 진입 종료 조건 확인
                 if (close_gimp - position_data[ticker]['position_gimp'] > close_gimp_gap

@@ -219,7 +219,7 @@ async def compare_price_open_order(
             # Telegram 주문 알림 데이터
             message = (f"{ticker} 진입\n"
                        f"요청주문김프: {round(open_gimp, 3)}%|{round(order_open_gimp, 3)}%\n"
-                       f"목표종료: {order_open_gimp + position_data[ticker]['target_grid']}%({position_data[ticker]['target_grid']})%\n"
+                       f"목표종료: {round(order_open_gimp + position_data[ticker]['target_grid'],3)}%({round(position_data[ticker]['target_grid'],3)})%\n"
                        f"RSI: {round(exchange_data['upbit_15_rsi'][ticker], 2)}%|{round(exchange_data['binance_15_rsi'][ticker], 2)}%\n"
                        f"누적진입김프: {position_data[ticker]['position_gimp']}%\n"
                        f"BTC김프: {round(btc_open_gimp, 3)}%\n"

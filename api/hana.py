@@ -27,22 +27,18 @@ def get_currency_data(currency):
             ## 2단계 pd.read_html를 통해서 특정 테이블을 df로 바로 가져오기
             df = pd.read_html(response.text)[0]
 
-            df.columns = ['회차', '시간', '현찰_살때', '현찰_팔때', '송금_보낼때', '송금_받을때', 'T/C', '외화', '매매기준율', '직전대비', '환가료율', '미화환산율']
-            df = df[['회차', '시간', '매매기준율']]
+            df = df[['회차', '시간', '매매 기준율']]
 
-            first_value = df.loc[df['회차'] == 1, '매매기준율'].values[0]
-            second_value = df.loc[df['회차'] == 2, '매매기준율'].values[0]
-            last_value = float(df.loc[df['회차'] == df['회차'].max(), '매매기준율'].values[0])
+            last_value = float(df.loc[0]['매매 기준율'].values[0])
 
             return last_value
         else:
             logging.info('페이지를 가져오는 데 문제가 발생했습니다. 상태 코드:', response.status_code)
-            return last_value
-
         response.close()
 
     except Exception as e:
         logging.info(traceback.format_exc())
         return 0
+
 
 
