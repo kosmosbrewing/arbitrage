@@ -9,7 +9,7 @@ Arbitrage는 한국 거래소(Upbit)와 글로벌 거래소(Binance) 간의 가�
 **전략**: Upbit 현물 매수 + Binance 선물 숏 포지션을 동시에 진입하여 김프 차익을 수익화
 
 <p align="left">
-  ![Alt text](./README.png)
+  <img src="./README.png" width="800" alt="Alt text">
 </p>
 
 ## 주요 기능
