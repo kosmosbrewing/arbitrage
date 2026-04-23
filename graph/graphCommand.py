@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 from matplotlib import pyplot as plt
 import measure
@@ -13,7 +14,7 @@ yesterday = yesterday.strftime("%Y%m%d")
 
 async def make_graph(date=yesterday):
     ENV = graphUtil.ENV
-    print(f"기준 일자: {date}")
+    logging.info(f"기준 일자: {date}")
 
     if ENV == 'real':
         image_file_path = '/root/arbitrage/image/arbitrage_' + str(date)

@@ -14,6 +14,7 @@ import time
 import hmac
 
 import util
+from api.binance_admin import change_leverage_all_ticker, change_margintype_all_ticker, funding_fee
 from consts import *
 from datetime import datetime, timezone, timedelta
 from api import checkOrderbook
@@ -157,60 +158,6 @@ async def futures_order(ticker, side, quantity, order_result, lock):
         logging.info("ORDER >> BINANCE 주문 실패")
         logging.info(f"Exception : {e}")
 
-
-async def funding_fee():
-    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
-    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
-    server_url = 'https://fapi.binance.com/fapi/v1/income'
-    timestamp = int(time.time() * 1000)
-
-    # 주문 정보 (예시 값)
-    payload = {
-        'incomeType': 'FUNDING_FEE',
-        'timestamp': timestamp
-    }
-    # 파라미터를 쿼리스트링 형태로 변환
-    query_string = '&'.join(["{}={}".format(k, v) for k, v in payload.items()])
-    # 헤더 설정
-    headers = {
-        'X-MBX-APIKEY': access_key
-    }
-    # 서명 생성
-    signature = hmac.new(key=secret_key.encode('utf-8'), msg=query_string.encode('utf-8'),
-                         digestmod=hashlib.sha256).hexdigest()
-    payload = {
-        'incomeType': 'FUNDING_FEE',
-        'timestamp': timestamp,
-        'signature': signature
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(server_url, headers=headers, params=payload) as res:
-                data = await res.json()
-
-        sum_income = 0
-        start_date = ''
-        end_date = ''
-        i = 0
-
-        for funding_fee in data:
-            if i == 0:
-                time_object_utc = datetime.utcfromtimestamp(funding_fee['time'] / 1000)
-                time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
-                start_date = time_object_korea.strftime('%m-%d %H:%M')
-            elif i == len(data)-1:
-                time_object_utc = datetime.utcfromtimestamp(funding_fee['time'] / 1000)
-                time_object_korea = time_object_utc.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=9)))
-                end_date = time_object_korea.strftime('%m-%d %H:%M')
-            sum_income += float(funding_fee['income'])
-            i += 1
-
-        return f"🤑총 펀딩피: {round(sum_income * TETHER,0):,}원|조회 일자: {start_date} ~ {end_date}"
-
-    except Exception as e:
-        print(f"Exception : {e}")
-
-
 async def connect_socket_futures_orderbook(orderbook_info, socket_connect, common_ticker):
     """Binance 소켓연결"""
     exchange = BINANCE
@@ -335,90 +282,5 @@ async def connect_socket_futures_orderbook(orderbook_info, socket_connect, commo
             logging.info(f"그외 에러 Exception : {e} {SOCKET_RETRY_TIME}초 후 재연결 합니다.")
             await asyncio.sleep(SOCKET_RETRY_TIME)
             continue
-
-def change_margintype_all_ticker():
-    # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
-    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
-    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
-    server_url = 'https://fapi.binance.com/fapi/v1/marginType'
-
-    # 변경할 레버리지
-    new_leverage = 'ISOLATED'
-
-    # 요청 헤더
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-MBX-APIKEY': access_key
-    }
-    # 모든 티커 가져오기
-    exchange_info_url = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
-    exchange_info_response = requests.get(exchange_info_url)
-    symbols = exchange_info_response.json()['symbols']
-    # 각 티커에 대해 레버리지 설정 변경
-    for symbol_info in symbols:
-        symbol = symbol_info['symbol']
-        timestamp = int(time.time() * 1000)
-        # 요청 매개변수
-        params = {
-            'symbol': symbol,
-            'marginType': new_leverage,
-            'timestamp': timestamp
-        }
-        # 시그니처 생성
-        query_string = '&'.join([f'{key}={params[key]}' for key in params])
-        signature = hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-        # API 요청 보내기
-        response = requests.post(server_url, params={**params, 'signature': signature}, headers=headers)
-        data = response.json()
-        # 응답 출력
-        print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
-        time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
-
-
-def change_leverage_all_ticker():
-    # 개발자가 Binance에서 발급받은 API 키와 시크릿 키
-    access_key = os.environ['BINANCE_OPEN_API_ACCESS_KEY']
-    secret_key = os.environ['BINANCE_OPEN_API_SECRET_KEY']
-    server_url = 'https://fapi.binance.com/fapi/v1/leverage'
-
-    print(access_key)
-    print(secret_key)
-
-    # 변경할 레버리지
-    new_leverage = 2
-
-    # 요청 헤더
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-MBX-APIKEY': access_key
-    }
-
-    print(headers)
-
-    # 모든 티커 가져오기
-    exchange_info_url = 'https://fapi.binance.com/fapi/v1/exchangeInfo'
-    exchange_info_response = requests.get(exchange_info_url)
-    symbols = exchange_info_response.json()['symbols']
-    # 각 티커에 대해 레버리지 설정 변경
-    for symbol_info in symbols:
-        symbol = symbol_info['symbol']
-        timestamp = int(time.time() * 1000)
-        # 요청 매개변수
-        params = {
-            'symbol': symbol,
-            'leverage': new_leverage,
-            'timestamp': timestamp
-        }
-        # 시그니처 생성
-        query_string = '&'.join([f'{key}={params[key]}' for key in params])
-        signature = hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-        # API 요청 보내기
-        response = requests.post(server_url, params={**params, 'signature': signature}, headers=headers)
-        data = response.json()
-        # 응답 출력
-        print(f"Symbol: {symbol}, Leverage: {new_leverage}, Response: {data}")
-        time.sleep(0.1)  # Binance API 규칙을 준수하기 위해 각 요청 사이에 일정한 시
-
-
 if __name__ == "__main__":
     get_all_book_ticker()

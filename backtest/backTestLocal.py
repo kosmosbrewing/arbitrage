@@ -1,7 +1,16 @@
 import util
 import backTestUtil
+import logging
 from backTestConsts import *
 from collections import deque
+from backTestShared import (
+    get_ticker_profit,
+    update_close_check_data,
+    update_close_position_data,
+    update_close_trade_data,
+    update_open_check_data,
+    update_open_position_data,
+)
 
 def data_initailize(ticker, position_data, trade_data, accum_ticker_count, accum_ticker_data):
     if ticker not in position_data:
@@ -151,12 +160,12 @@ def get_measure_ticker():
                 trade_data[ticker].update({"total_quantity": open_quantity})
 
             ## 주문 로직
-            print(f"{date_time}{ticker}|진입|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
-                f"|C_CLOSE_GIMP|{close_gimp}|C_OPEN_GIMP|{open_gimp}|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}"
-                f"|BTC_OPEN_GIMP|{round(btc_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
-                f"|INSATLL|{position_data[ticker]['open_install_count']}|BID_PRICE|{trade_data[ticker]['open_bid_price']}"
-                f"|TRD_QUANTITY|{trade_data[ticker]['open_quantity']}|TOT_QUANTITY|{trade_data[ticker]['total_quantity']}"
-                f"|BALANCE|{round(remain_bid_balance, 2)}")
+            logging.info(f"{date_time}{ticker}|진입|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
+                         f"|C_CLOSE_GIMP|{close_gimp}|C_OPEN_GIMP|{open_gimp}|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}"
+                         f"|BTC_OPEN_GIMP|{round(btc_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
+                         f"|INSATLL|{position_data[ticker]['open_install_count']}|BID_PRICE|{trade_data[ticker]['open_bid_price']}"
+                         f"|TRD_QUANTITY|{trade_data[ticker]['open_quantity']}|TOT_QUANTITY|{trade_data[ticker]['total_quantity']}"
+                         f"|BALANCE|{round(remain_bid_balance, 2)}")
 
         # 저점 진입 김프 <-> 현재 포지션 종료 김프 계산하여 수익 변동성 확인
         if close_gimp - check_data[ticker]['open_gimp'] > OPEN_GIMP_GAP:
@@ -227,7 +236,7 @@ def get_measure_ticker():
                 #upbit.spot_order(upbit_market, upbit_side, upbit_price, upbit_quantity)
                 #binance.futures_order(binance_market, binance_side, binance_quantity)
 
-                print(
+                logging.info(
                     f"{date_time}{ticker}|익절|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}|P_CLOSE_GIMP|{close_gimp}"
                     f"|GIMP_GAP|{round(close_gimp - position_data[ticker]['position_gimp'], 2)}"
                     f"|C_INSTALL|{position_data[ticker]['close_install_count']}|O_INSTALL|{position_data[ticker]['open_install_count']}"
@@ -245,50 +254,17 @@ def get_measure_ticker():
 
     for ticker in trade_data:
         if trade_data[ticker]['profit_count'] >= 1:
-            print(f"{date_time}{ticker}|손익|OPEN_COUNT|{position_data[ticker]['accum_open_install_count']}"
-              f"|PROFIT_COUNT|{trade_data[ticker]['profit_count']}"
-              f"|T_PROFIT|{trade_data[ticker]['total_profit']}")
+            logging.info(f"{date_time}{ticker}|손익|OPEN_COUNT|{position_data[ticker]['accum_open_install_count']}"
+                         f"|PROFIT_COUNT|{trade_data[ticker]['profit_count']}"
+                         f"|T_PROFIT|{trade_data[ticker]['total_profit']}")
 
     for ticker in position_data:
         if position_data[ticker]['position'] == 1:
-            print(f"{date_time}{ticker}|포지션유지|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
-                  f"|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
-                  f"|INSATLL|{position_data[ticker]['open_install_count']}"
-                  f"|BID_PRICE|{trade_data[ticker]['open_bid_price']}|BALANCE|{round(remain_bid_balance, 2)}")
+            logging.info(f"{date_time}{ticker}|포지션유지|P_OPEN_GIMP|{position_data[ticker]['position_gimp']}"
+                         f"|AVG_OPEN_GIMP|{round(average_open_gimp, 2)}|OPEN_COUNT|{sum(accum_ticker_count[ticker])}"
+                         f"|INSATLL|{position_data[ticker]['open_install_count']}"
+                         f"|BID_PRICE|{trade_data[ticker]['open_bid_price']}|BALANCE|{round(remain_bid_balance, 2)}")
 
     util.put_remain_position(position_data, trade_data)
-
-def update_open_check_data(ticker, check_data, open_gimp, open_bid, open_ask):
-    check_data[ticker].update({"open_gimp": open_gimp, "open_bid": open_bid, "open_ask": open_ask})
-
-def update_close_check_data(ticker, check_data, close_gimp, close_bid, close_ask):
-    check_data[ticker].update({"close_gimp": close_gimp, "close_bid": close_bid, "close_ask": close_ask})
-
-def update_open_position_data(ticker, position_data, open_gimp):
-    position_data[ticker]['open_install_count'] += 1
-    position_data[ticker]['accum_open_install_count'] += 1
-    position_data[ticker]['position_gimp_accum'] += open_gimp
-    position_data[ticker]['position_gimp'] = round(position_data[ticker]['position_gimp_accum']
-                                                  / position_data[ticker]['open_install_count'], 2)
-    position_data[ticker]['position'] = 1
-    position_data[ticker]['close_count'] = 0
-
-def update_close_trade_data(ticker, trade_data):
-    trade_data[ticker].update({"open_bid_price": 0, "open_ask_price": 0,
-                               "close_bid_price": 0, "close_ask_price": 0,
-                               "open_quantity": 0, "close_quantity": 0, "total_quantity": 0,"trade_profit": 0})
-
-def update_close_position_data(ticker, position_data):
-    position_data[ticker].update({"position": 0, "close_count": 0, "position_gimp_accum": 0,
-                                  "open_install_count": 0, "close_install_count": 0})
-
-def get_ticker_profit(trade_data, open_profit, close_profit, total_fee, ticker):
-    total_profit = round(open_profit + close_profit - total_fee, 2)
-    trade_data[ticker].update({"trade_profit": total_profit})
-    trade_data[ticker]['profit_count'] += 1
-    trade_data[ticker]['total_profit'] += trade_data[ticker]['trade_profit']
-
-    return trade_data
-
 if __name__ == "__main__":
     get_measure_ticker()

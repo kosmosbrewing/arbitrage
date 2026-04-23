@@ -16,7 +16,7 @@ def get_currency_data():
 
     soup = BeautifulSoup(html, 'html.parser')
     #usd_price_class = soup.find(attrs={"data-test": "instrument-price-last"})
-    print(soup)
+    logging.info(soup)
 
     #table = soup.select("text-5xl/9 font-bold md:text-[42px] md:leading-[60px] text-[#232526]")
     #print(f"TEST!!!\n {usd_price_class}")
@@ -61,4 +61,4 @@ if __name__ == "__main__":
     # 가격 데이터를 순회하며 트레일링 스탑 업데이트
     for price in price_data:
         action = trailing_stop.update_price(price)
-        print(f"Current Price: {price}, Action: {action}")
+        logging.info(f"Current Price: {price}, Action: {action}")

@@ -1,5 +1,6 @@
 import os
 import datetime
+import logging
 import sys
 sys.path.append('../api')
 #from api import upbit
@@ -17,7 +18,7 @@ def get_measure_ticker(date):
 
     #upbit.accum_top_ticker(measure_ticker)
 
-    print(f"TEST {measure_ticker}")
+    logging.info(f"TEST {measure_ticker}")
     for line in lines:
         try:
             split_data = line.split('|')
@@ -78,6 +79,6 @@ def get_measure_ticker(date):
             measure_ticker[ticker] = {"units": []}
 
     for ticker in measure_ticker:
-        print(f"{ticker}")
+        logging.info(f"{ticker}")
 
     return measure_ticker

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from matplotlib import pyplot as plt
 import measure
 import graphUtil
@@ -23,7 +24,7 @@ async def make_graph():
         with open(history_file_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
     else:
-        print(f"There is no File {history_file_path}")
+        logging.info(f"There is no File {history_file_path}")
     # BTC랑 ETH는 무조건 추가
     measure_ticker['ETH'] = {"units": []}
 

@@ -24,7 +24,7 @@ class Premium:
         util.setup_order_logging()
 
     async def run(self):
-        await util.send_to_telegram('🚀 Start Premium Bot 🚀')
+        await util.send_to_telegram(f'🚀 Start Premium Bot 🚀\nExecution Mode: {EXECUTION_MODE}')
         common_ticker = checkOrderbook.get_common_orderbook_ticker()
 
         await asyncio.wait([
@@ -106,7 +106,7 @@ class Premium:
                     logging.info(message)
                     socket_check += 1
 
-                    if socket_connect == 3:
+                    if socket_check == 3:
                         socket_check = 0
 
                     await asyncio.sleep(SOCKET_RETRY_TIME)

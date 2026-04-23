@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 import traceback
 from matplotlib import pyplot as plt
@@ -13,7 +14,7 @@ yesterday = yesterday.strftime("%Y%m%d")
 
 async def make_graph(date=yesterday):
     ENV = graphUtil.ENV
-    print(f"기준 일자: {date}")
+    logging.info(f"기준 일자: {date}")
 
     if ENV == 'real':
         image_file_path = '/root/arbitrage/image/arbitrage_' + str(date)
@@ -27,9 +28,9 @@ async def make_graph(date=yesterday):
 
     try:
         await upbit.accum_top_ticker(temp_list)
-        print(temp_list)
+        logging.info(temp_list)
     except Exception as e:
-        print(e)
+        logging.info(e)
 
     measure_ticker['USDT'] = {"units": []}
     measure_ticker['BTC'] = {"units": []}
@@ -89,7 +90,7 @@ async def make_graph(date=yesterday):
                                                         "upbit_240_rsi": upbit_240_rsi, "binance_240_rsi": binance_240_rsi,
                                                         "rsi_15_gap": rsi_15_gap, "rsi_240_gap": rsi_240_gap})
         except Exception as e:
-            print(e)
+            logging.info(e)
 
     # 그래프 변수 초기화
     subplot_loc = []
@@ -130,7 +131,7 @@ async def make_graph(date=yesterday):
                 rsi_240_gap.append(float(measure_ticker[graph_ticker]['units'][i]['rsi_240_gap']))
 
         except Exception as e:
-            print(f"Exception : {e}")
+            logging.info(f"Exception : {e}")
 
         time_len = len(time)
 
@@ -222,7 +223,7 @@ async def make_graph(date=yesterday):
                 remain_dix = 1
 
         except Exception as e:
-            print(f"{ticker} 오류.. Continue... {e}")
+            logging.info(f"{ticker} 오류.. Continue... {e}")
 
     if subplot_idx != len(subplot_loc[0]) and remain_dix == 0:
         image_temp = image_file_path + '_' + str(figure_idx + 1) + '.png'
@@ -234,16 +235,16 @@ async def make_graph(date=yesterday):
         message = '[News Coo 🦤]\n🔵진입김프(UPBIT⬆️/BINANCE⬇️)|\n🔴탈출김프(UPBIT⬇️/BINANCE⬆️)|\n⚫️Bitcoin진입김프(UPBIT⬆️/BINANCE⬇️)'
         await graphUtil.send_to_telegram(message)
 
-        print(image_set)
+        logging.info(image_set)
 
         image_set = list(set(image_set))
 
-        print(image_set)
+        logging.info(image_set)
 
         for image in image_set:
             await graphUtil.send_to_telegram_image(image)
     except Exception as e:
-        print(e)
+        logging.info(e)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

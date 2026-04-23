@@ -9,7 +9,7 @@ import telegram
 bot = None
 chat_id_list = None
 ENV = 'real'
-TELEGRAM_BOT_TOKEN = "6729803794:AAEEX8oOTfTp2iYXnCrTMcNm7aDwewuGJL0"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_MESSAGE_MAX_SIZE = 4096
 
 def load_history_data(date):
@@ -27,6 +27,7 @@ def load_history_data(date):
             lines = file.readlines()
     else:
         logging.info(f"{history_file_path} 파일이 존재하지 않습니다.")
+        lines = []
 
     return lines
 
@@ -44,7 +45,7 @@ def load_chat_id():
             lines = file.readlines()
 
     else:
-        print(f"{load_path} 파일이 존재하지 않습니다.")
+        logging.info(f"{load_path} 파일이 존재하지 않습니다.")
 
     return lines
 
@@ -66,7 +67,10 @@ def put_chat_id(chat_id_list):
             file.write(put_data)
 
 def get_chat_id():
-    print("Telegram Chat ID 요청합니다..")
+    if not TELEGRAM_BOT_TOKEN:
+        logging.info("TELEGRAM_BOT_TOKEN is not set")
+        return
+    logging.info("Telegram Chat ID 요청합니다..")
     try:
         response = requests.get(f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates')
         if response.status_code == 200:
@@ -76,17 +80,17 @@ def get_chat_id():
             for result in chat_id_group:
                 temp_list.append(result['message']['chat']['id'])
             chat_id_list = list(set(temp_list))
-            print(f"Telegram Chat ID 응답 : {chat_id_list}, Put Chat Id")
+            logging.info(f"Telegram Chat ID 응답 : {chat_id_list}, Put Chat Id")
             put_chat_id(chat_id_list)
         else:
-            print(f"Telegram Chat ID 요청 응답 오류: {response.status}")
+            logging.info(f"Telegram Chat ID 요청 응답 오류: {response.status}")
     except aiohttp.ClientError as e:
-        print(f"Telegram 세션연결 오류: {e}")
+        logging.info(f"Telegram 세션연결 오류: {e}")
 
 def get_chat_id_list():
-    print("Telegram Chat ID 요청합니다..")
+    logging.info("Telegram Chat ID 요청합니다..")
     try:
-        print(f"Load Put Chat Id")
+        logging.info("Load Put Chat Id")
         lines = load_chat_id()
         temp_list = []
         for line in lines:
@@ -96,20 +100,24 @@ def get_chat_id_list():
 
         return send_chat_id_list
     except Exception as e:
-        print(f"Get Chat ID List 오류: {e}")
+        logging.info(f"Get Chat ID List 오류: {e}")
 
 async def send_to_telegram(message):
     # 텔레그램 메시지 보내는 함수, 최대 3회 연결, 3회 전송 재시도 수행
     global bot
 
+    if not TELEGRAM_BOT_TOKEN:
+        logging.info("TELEGRAM_BOT_TOKEN is not set")
+        return
+
     get_chat_id()
     send_chat_id_list = get_chat_id_list()
     # chat_id_list = ['1109591824'] # 준우
     # chat_id_list = ['2121677449']  # 규빈
-    print(f"Telegram Chat ID 값 취득 : {send_chat_id_list}")
+    logging.info(f"Telegram Chat ID 값 취득 : {send_chat_id_list}")
 
     if bot is None:
-        print("Telegram 연결 시도...")
+        logging.info("Telegram 연결 시도...")
         bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
 
     for chat_id in send_chat_id_list:
@@ -120,25 +128,28 @@ async def send_to_telegram(message):
                 await bot.send_message(chat_id, message[:TELEGRAM_MESSAGE_MAX_SIZE])
                 break
             except telegram.error.TimedOut as e:
-                print(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
+                logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
 
                 await asyncio.sleep(5)
             except Exception as e:
-                print(f"Telegram 연결 해제... {e}")
+                logging.info(f"Telegram 연결 해제... {e}")
                 bot = None
                 break
 
 async def send_to_telegram_image(image):
     # 텔레그램 메시지 보내는 함수, 최대 3회 연결, 3회 전송 재시도 수행
     global bot
+    if not TELEGRAM_BOT_TOKEN:
+        logging.info("TELEGRAM_BOT_TOKEN is not set")
+        return
     get_chat_id()
     send_chat_id_list = get_chat_id_list()
     # chat_id_list = ['1109591824'] # 준우
     # chat_id_list = ['2121677449']  # 규빈
-    print(f"Telegram Chat ID 값 취득 : {send_chat_id_list}")
+    logging.info(f"Telegram Chat ID 값 취득 : {send_chat_id_list}")
 
     if bot is None:
-        print("Telegram 연결 시도...")
+        logging.info("Telegram 연결 시도...")
         bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
 
     for chat_id in send_chat_id_list:
@@ -148,9 +159,9 @@ async def send_to_telegram_image(image):
                 await bot.send_photo(chat_id, photo=open(image, 'rb'))
                 break
             except telegram.error.TimedOut as e:
-                print(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
+                logging.info(f"Telegram {chat_id} msg 전송 오류... {i + 1} 재시도... : {e}")
                 await asyncio.sleep(5)
             except Exception as e:
-                print(f"Telegram 연결 해제... {e}")
+                logging.info(f"Telegram 연결 해제... {e}")
                 bot = None
                 break

@@ -1,14 +1,12 @@
 import asyncio
-import json
 import logging
 import time
 import traceback
-from datetime import datetime, timezone, timedelta
-import aiohttp
+from datetime import datetime, timezone
 import pandas as pd
 import requests
-from collections import Counter
 from api import upbit, binance
+from api.checkOrderbook import get_common_orderbook_ticker
 
 """
 Docs: https://apidocs.bithumb.com/reference
@@ -20,16 +18,18 @@ async def check_15_rsi(exchange_data, duplicates):
             exchange_data['upbit_15_rsi'][ticker] = 0
 
         if ticker not in exchange_data['binance_15_rsi']:
-             exchange_data['upbit_15_rsi'][ticker] = 0
+             exchange_data['binance_15_rsi'][ticker] = 0
 
         await asyncio.gather(
             check_upbit_rsi(exchange_data, ticker, 15),
             check_binance_rsi(exchange_data, ticker, 15)
         )
+
+
 async def check_240_rsi(exchange_data, duplicates):
     for ticker in duplicates:
         if ticker not in exchange_data['upbit_240_rsi']:
-             exchange_data['binance_240_rsi'][ticker] = 0
+             exchange_data['upbit_240_rsi'][ticker] = 0
 
         if ticker not in exchange_data['binance_240_rsi']:
              exchange_data['binance_240_rsi'][ticker] = 0
@@ -55,7 +55,6 @@ async def check_upbit_rsi(exchange_data, ticker, interval):
             df = df.reindex(index=df.index[::-1]).reset_index()
 
             last_rsi = rsi(df, 12).iloc[-1]
-            print(f"{ticker} {i+1} UPBIT {interval} RSI : {last_rsi}")
             sum_rsi += last_rsi
 
         u_rsi = 'upbit_' + str(interval) + '_rsi'
@@ -86,7 +85,7 @@ async def check_binance_rsi(exchange_data, ticker, interval):
 
             for entry in data:
                 timestamp_seconds = entry[0] / 1000.0
-                utc_time = datetime.utcfromtimestamp(timestamp_seconds)
+                utc_time = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
 
                 json_entry = {
                     "timestamp": utc_time.isoformat(),
@@ -94,11 +93,9 @@ async def check_binance_rsi(exchange_data, ticker, interval):
                 }
                 json_data.append(json_entry)
 
-            json_string = json.loads(json.dumps(json_data))
-            df = pd.DataFrame(json_string)
+            df = pd.DataFrame(json_data)
 
             last_rsi = rsi(df, 12).iloc[-1]
-            print(f"{ticker} {i+1} BINANCE {interval} RSI : {last_rsi}")
             sum_rsi += last_rsi
 
         b_rsi = 'binance_' + str(interval) + '_rsi'
@@ -124,43 +121,29 @@ def rsi(ohlc: pd.DataFrame, period: int = 14):
 
     return round(pd.Series(100 - (100 / (1 + RS)), name="RSI"), 2)
 
-def get_duplicate_ticker():
-    krw_ticker = upbit.get_all_ticker()
-    usdt_ticker = binance.get_all_book_ticker()
-
-    for i in range(len(krw_ticker)):
-        krw_ticker[i] = krw_ticker[i].split('-')[1]
-
-    for i in range(len(usdt_ticker)):
-        usdt_ticker[i] = usdt_ticker[i].replace("usdt@depth", "")
-        usdt_ticker[i] = usdt_ticker[i].upper()
-
-    krw_ticker = set(krw_ticker)
-    usdt_ticker = set(usdt_ticker)
-
-    counter = Counter(list(krw_ticker) + list(usdt_ticker))
-
-    # 빈도가 1보다 큰 요소들을 찾아 중복된 값을 구합니다.
-    return [element for element, count in counter.items() if count > 1]
+# 중복 티커 헬퍼는 checkOrderbook.get_common_orderbook_ticker()를 단일 원천으로 사용한다.
+# Backwards-compat alias so legacy callers keep working after TD-11 consolidation.
+get_duplicate_ticker = get_common_orderbook_ticker
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     exchange_data = {}
     exchange_data['upbit_15_rsi'] = {}
     exchange_data['binance_15_rsi'] = {}
     exchange_data['upbit_240_rsi'] = {}
     exchange_data['binance_240_rsi'] = {}
 
-    duplicates = get_duplicate_ticker()
-    print(duplicates)
+    duplicates = get_common_orderbook_ticker()
+    logging.info(duplicates)
     while True:
         try:
             asyncio.run(check_240_rsi(exchange_data, duplicates))
             #asyncio.gather(check_15_rsi(exchange_data, 15, duplicates))
 
-            print()
+            logging.info("")
             time.sleep(10)
         except Exception as e:
-            print(traceback.format_exc())
+            logging.info(traceback.format_exc())
 
 
 

@@ -1,13 +1,17 @@
 import asyncio
-from collections import Counter
-
-import api.checkRSI
-from compareprice import comparePrice
-from api import upbit, binance, bithumb, checkOrderbook, checkRSI
-import util
-import traceback
 import logging
-from consts import *
+import traceback
+
+from api import binance, bithumb, checkOrderbook, checkRSI, upbit
+from compareprice import comparePrice
+from consts import (
+    BALANCE,
+    CHECK_ORDERBOOK_START_DELAY,
+    COMPARE_PRICE_CHECK,
+    COMPARE_PRICE_START_DELAY,
+    SOCKET_RETRY_TIME,
+)
+import util
 
 """
     :param exchange : 거래소 명
@@ -90,7 +94,7 @@ class Premium:
         self.exchange_data['upbit_15_rsi'] = {}
         self.exchange_data['binance_15_rsi'] = {}
 
-        duplicates = api.checkRSI.get_duplicate_ticker()
+        duplicates = checkOrderbook.get_common_orderbook_ticker()
 
         try:
             while True:
@@ -103,7 +107,7 @@ class Premium:
         self.exchange_data['upbit_240_rsi'] = {}
         self.exchange_data['binance_240_rsi'] = {}
 
-        duplicates = api.checkRSI.get_duplicate_ticker()
+        duplicates = checkOrderbook.get_common_orderbook_ticker()
 
         try:
             while True:

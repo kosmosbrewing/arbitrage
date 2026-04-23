@@ -48,10 +48,10 @@ def load_history_data():
         history_file_path = '/log/premium_data_all'
 
     if os.path.exists(history_file_path):
-        print(history_file_path)
+        logging.info(history_file_path)
         with open(history_file_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
     else:
-        print(f"{history_file_path} 파일이 존재하지 않습니다.")
+        logging.info(f"{history_file_path} 파일이 존재하지 않습니다.")
 
     return lines
